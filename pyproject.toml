@@ -1,0 +1,55 @@
+[build-system]
+requires = ["poetry-core>=1.9.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "LambdaCat"
+version = "0.1.0"
+description = "LambdaCat: functional core for categories with pluginable extras"
+authors = ["You <you@example.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{ include = "LambdaCat", from = "src" }]
+keywords = ["category-theory", "functional", "dsl"]
+homepage = "https://github.com/yourorg/LambdaCat"
+repository = "https://github.com/yourorg/LambdaCat"
+documentation = "https://github.com/yourorg/LambdaCat#readme"
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Typing :: Typed",
+]
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.13"
+typing-extensions = {version = ">=4.7", python = "<3.11"}
+
+# optional deps (extras placeholders; core should not import these at runtime)
+networkx = {version = ">=3.1", optional = true}
+graphviz = {version = ">=0.20.1", optional = true}
+pydot = {version = ">=1.4.2", optional = true}
+numpy = {version = ">=1.24", optional = true}
+
+[tool.poetry.extras]
+tamari = ["networkx"]
+viz = ["graphviz", "pydot"]
+mcts = ["numpy"]
+all = ["networkx", "graphviz", "pydot", "numpy"]
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.2"
+hypothesis = ">=6.98"
+mypy = ">=1.8"
+ruff = ">=0.5.0"
+build = ">=1.2"
+twine = ">=5.0"
+pytest-cov = ">=5.0"
+
+[tool.ruff]
+line-length = 100
+extend-select = ["I", "F", "E", "W", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
