@@ -6,6 +6,7 @@ from typing import Any, Callable, Generic, Iterable, List, Mapping, Sequence, Tu
 
 from .actions import Plan
 from .runtime import strong_monoidal_functor, call_action, compile_structured_plan
+from .runtime import Action
 from ..core.presentation import Formal1
 
 
@@ -74,21 +75,30 @@ def run_structured_plan(
     aggregate_fn: Callable[[List[State]], State] | None = None,
     snapshot: bool = False,
 ) -> RunReport[State]:
-    runner = compile_structured_plan(implementation, plan, choose_fn=choose_fn, aggregate_fn=aggregate_fn)
-    t0 = _now_ms()
-    try:
-        output = runner(input_value, ctx)
-        ok = True
-    except Exception:
-        ok = False
-        raise
-    finally:
-        duration = _now_ms() - t0
-    step_name = type(plan).__name__
-    trace: List[StepTrace[State]] = [
-        StepTrace(step_name, ok, duration, input_value if snapshot else None, output if snapshot else None)
-    ]
-    return RunReport(output=output, score=None, trace=tuple(trace))
+    # Per-task tracing by wrapping actions
+    traces: List[StepTrace[State]] = []
+
+    def _wrap(name: str, fn: Callable[..., State]) -> Action[State, Ctx]:
+        def wrapped(x: State, c: Ctx | None = None) -> State:
+            before = x if snapshot else None
+            t0 = _now_ms()
+            try:
+                y = call_action(fn, x, c)
+                ok_local = True
+            except Exception:
+                ok_local = False
+                raise
+            finally:
+                duration = _now_ms() - t0
+            after = y if snapshot else None
+            traces.append(StepTrace(name, ok_local, duration, before, after))
+            return y
+        return wrapped
+
+    traced_impl: Mapping[str, Action[State, Ctx]] = {k: _wrap(k, v) for k, v in implementation.items()}
+    runner = compile_structured_plan(traced_impl, plan, choose_fn=choose_fn, aggregate_fn=aggregate_fn)
+    output = runner(input_value, ctx)
+    return RunReport(output=output, score=None, trace=tuple(traces))
 
 
 def choose_best(
@@ -154,4 +164,44 @@ class Agent(Generic[State, Ctx]):
         if self.evaluator is None:
             raise AssertionError("Agent.choose_best requires an evaluator")
         return choose_best(candidates, self.implementation, input_value, ctx=ctx, evaluator=self.evaluator, snapshot=self.snapshot)
+
+    # -------------------------- Convenience helpers --------------------------
+
+    def plan(self, *names: str) -> Formal1:
+        return Formal1(tuple(names))
+
+    def run_seq(self, *names: str, input_value: State, ctx: Ctx | None = None) -> RunReport[State]:
+        return self.run(self.plan(*names), input_value, ctx=ctx)
+
+
+# ------------------------------ Agent Builder ------------------------------
+
+
+class AgentBuilder(Generic[State, Ctx]):
+    def __init__(self, implementation: Mapping[str, Callable[..., State]]):
+        self._implementation = implementation
+        self._evaluator: Callable[[State], Score] | None = None
+        self._snapshot: bool = False
+
+    def with_evaluator(self, evaluator: Callable[[State], Score]) -> "AgentBuilder[State, Ctx]":
+        self._evaluator = evaluator
+        return self
+
+    def with_snapshot(self, snapshot: bool) -> "AgentBuilder[State, Ctx]":
+        self._snapshot = snapshot
+        return self
+
+    def build(self) -> Agent[State, Ctx]:
+        # Validate implementation signatures: accept (x) or (x, ctx)
+        for name, fn in self._implementation.items():
+            try:
+                # Reuse call helper to validate arity using a dummy value is unsafe; instead inspect
+                from inspect import signature
+
+                params = list(signature(fn).parameters.values())
+                if len(params) not in (1, 2):
+                    raise TypeError
+            except Exception:
+                raise TypeError(f"Action '{name}' must accept 1 or 2 parameters (x) or (x, ctx)")
+        return Agent(self._implementation, evaluator=self._evaluator, snapshot=self._snapshot)
 

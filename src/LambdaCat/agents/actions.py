@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Callable, Final, Generic, Tuple, TypeVar, Union
+from typing import Any, Callable, Final, Generic, Mapping, Tuple, TypeVar, Union
 from ..core.presentation import Formal1
 
 
@@ -98,3 +98,85 @@ def focus(l: Lens[State, Sub], inner: Plan[Sub, Ctx]) -> Plan[State, Ctx]:
 def loop_while(predicate: Callable[[State], bool], body: Plan[State, Ctx]) -> Plan[State, Ctx]:
     return LoopWhile(predicate=predicate, body=body)
 
+
+# ------------------------------ Actions registry ------------------------------
+
+
+Fn = Callable[..., State]
+
+
+@dataclass(frozen=True)
+class Actions(Generic[State, Ctx]):
+    _name_to_fn: Mapping[str, Fn]
+    _fn_to_name: Mapping[Fn, str]
+
+    @classmethod
+    def empty(cls) -> "Actions[State, Ctx]":
+        return cls(_name_to_fn={}, _fn_to_name={})
+
+    def mapping(self) -> Mapping[str, Fn]:
+        return dict(self._name_to_fn)
+
+    def register(self, name: str, fn: Fn) -> "Actions[State, Ctx]":
+        if not isinstance(name, str) or not name:
+            raise AssertionError("Action name must be a non-empty string")
+        if name in self._name_to_fn:
+            raise AssertionError(f"Duplicate action name: {name}")
+        if fn in self._fn_to_name and self._fn_to_name[fn] != name:
+            raise AssertionError(f"Function already registered as '{self._fn_to_name[fn]}'")
+        # Create fresh maps to preserve immutability
+        new_n2f = dict(self._name_to_fn)
+        new_f2n = dict(self._fn_to_name)
+        new_n2f[name] = fn
+        new_f2n[fn] = name
+        return Actions(_name_to_fn=new_n2f, _fn_to_name=new_f2n)
+
+    def name_of(self, fn: Fn) -> str:
+        if fn not in self._fn_to_name:
+            raise KeyError("Function not registered in Actions registry")
+        return self._fn_to_name[fn]
+
+    # ----------------------- Bound structured plan builders -----------------------
+
+    def task(self, name_or_fn: Union[str, Fn]) -> Plan[State, Ctx]:
+        if isinstance(name_or_fn, str):
+            if name_or_fn not in self._name_to_fn:
+                raise KeyError(f"Unknown action name: {name_or_fn}")
+            return task(name_or_fn)
+        # Callable case
+        name = self.name_of(name_or_fn)
+        return task(name)
+
+    def sequence(self, *items: Union[Plan[State, Ctx], str, Fn]) -> Plan[State, Ctx]:
+        normalized: Tuple[Plan[State, Ctx], ...] = tuple(
+            self._normalize_item(i) for i in items
+        )
+        return sequence(*normalized)
+
+    def parallel(self, *items: Union[Plan[State, Ctx], str, Fn]) -> Plan[State, Ctx]:
+        normalized: Tuple[Plan[State, Ctx], ...] = tuple(
+            self._normalize_item(i) for i in items
+        )
+        return parallel(*normalized)
+
+    def choose(self, *items: Union[Plan[State, Ctx], str, Fn]) -> Plan[State, Ctx]:
+        normalized: Tuple[Plan[State, Ctx], ...] = tuple(
+            self._normalize_item(i) for i in items
+        )
+        return choose(*normalized)
+
+    def focus(self, l: Lens[State, Any], inner: Plan[Any, Ctx]) -> Plan[State, Ctx]:
+        return focus(l, inner)
+
+    def loop_while(self, predicate: Callable[[State], bool], body: Plan[State, Ctx]) -> Plan[State, Ctx]:
+        return loop_while(predicate, body)
+
+    # --------------------------------- Utilities ---------------------------------
+
+    def _normalize_item(self, item: Union[Plan[State, Ctx], str, Fn]) -> Plan[State, Ctx]:
+        if isinstance(item, (Task, Sequence, Parallel, Choose, Focus, LoopWhile)):
+            return item
+        if isinstance(item, str):
+            return self.task(item)
+        # Callable -> resolve to registered name
+        return self.task(item)

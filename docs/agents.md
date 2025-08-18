@@ -8,7 +8,8 @@ Minimal, composable pipelines built from named actions.
 from LambdaCat.agents import (
   task, sequence, parallel, choose, lens, focus, loop_while,
   strong_monoidal_functor, compile_structured_plan,
-  Agent, run_plan, run_structured_plan, choose_best, quick_functor_laws,
+  Agent, AgentBuilder, run_plan, run_structured_plan, choose_best, quick_functor_laws,
+  Actions, concat, first, argmax,
 )
 ```
 
@@ -49,7 +50,32 @@ Task calls an Action. Actions are functions; Tasks are nodes in a plan.
   - `Choose`: evaluate branches, then select exactly one via `choose_fn`
 - This tree is a pure data structure (no side effects), suitable for tracing, testing, or serialization.
 
-## Define actions
+## Quickstart: create an agent in 3 steps
+
+```python
+from LambdaCat.agents import Actions, AgentBuilder, task, sequence, parallel, run_structured_plan, concat
+
+# 1) Register actions (pure functions).
+actions = (
+  Actions[str, dict].empty()
+    .register('strip_ws', lambda s, ctx=None: s.strip())
+    .register('to_lower', lambda s, ctx=None: s.lower())
+    .register('keywords', lambda s, ctx=None: ' '.join(sorted(set(w for w in s.split() if len(w) > 3))))
+)
+
+# 2) Build a plan using bound builders (by name or by function).
+plan = actions.sequence(
+  actions.task('strip_ws'),
+  actions.parallel(actions.task('to_lower'), actions.task('keywords')),
+)
+
+# 3) Build and run the agent.
+agent = AgentBuilder(actions.mapping()).with_snapshot(True).build()
+report = run_structured_plan(plan, actions.mapping(), input_value='  Hello Lambda-Cat  ', aggregate_fn=concat(' | '))
+print(report.output)
+```
+
+## Define actions (manual mapping)
 ```python
 actions = {
   'denoise': lambda s, ctx=None: s.replace('~',''),
@@ -87,7 +113,7 @@ best_plan, best_report = choose_best(
 ## Structured plans (Sequence / Parallel / Choose)
 
 ```python
-from LambdaCat.agents import task, sequence, parallel, run_structured_plan
+from LambdaCat.agents import task, sequence, parallel, run_structured_plan, concat
 
 structured = sequence(
   task('denoise'),
@@ -99,21 +125,21 @@ report = run_structured_plan(
   structured,
   actions,
   input_value="~a~b_c-1",
-  aggregate_fn=lambda outs: ''.join(outs),
+  aggregate_fn=concat(''),
 )
 print(report.output)
 ```
 
 ```python
 # Choose example: pick best branch by a custom chooser
-from LambdaCat.agents import choose
+from LambdaCat.agents import choose, argmax
 
 branching = choose(task('segment'), task('merge'))
 best = run_structured_plan(
   branching,
   actions,
   input_value="ab",
-  choose_fn=lambda outs: max(range(len(outs)), key=lambda i: len(str(outs[i]))),
+  choose_fn=argmax(lambda s: len(str(s))),
 )
 print(best.output)
 ```
@@ -170,3 +196,10 @@ assert pipeline.run("oops") == Maybe(None)
 - Actions must accept `(x)` or `(x, ctx)`
 - Unsupported modes raise
 - Deterministic execution; traces carry per-step timings and snapshots
+
+
+## Tracing and visualization
+
+- `run_structured_plan` records per-task traces when the interpreter executes leaf tasks.
+- Use `extras.viz_mermaid.exec_gantt_mermaid(report)` to render a Gantt chart from a `RunReport`.
+- Linear plans: `extras.viz_mermaid.plan_mermaid(Formal1(...))`; structured plan diagram support is planned via `structured_plan_mermaid`.

@@ -6,6 +6,8 @@ from typing import Any, Callable, List, Mapping
 from LambdaCat.core.presentation import Formal1
 from LambdaCat.agents import (
     Agent,
+    AgentBuilder,
+    Actions,
     task,
     sequence,
     parallel,
@@ -14,7 +16,13 @@ from LambdaCat.agents import (
     focus,
     run_structured_plan,
     quick_functor_laws,
+    concat,
+    first,
+    argmax,
 )
+from LambdaCat.agents.actions import loop_while
+from LambdaCat.extras.viz_mermaid import plan_mermaid, structured_plan_mermaid, exec_gantt_mermaid
+from pathlib import Path
 
 
 # -----------------------------
@@ -73,6 +81,19 @@ Implementation: Mapping[str, Callable[..., str]] = {
     "to_upper": to_upper,
 }
 
+# Also expose a registry-based interface
+Registry = (
+    Actions[str, Any].empty()
+    .register("identity", identity)
+    .register("strip_ws", strip_ws)
+    .register("to_lower", to_lower)
+    .register("remove_noise", remove_noise)
+    .register("normalize_ws", normalize_ws)
+    .register("summarize_head", summarize_head)
+    .register("extract_keywords", extract_keywords)
+    .register("to_upper", to_upper)
+)
+
 
 # -----------------------------
 # Demo 1: Linear plan + chooser
@@ -93,17 +114,8 @@ def demo_linear_plan(input_text: str) -> None:
 # Demo 2: Structured plan (parallel + choose)
 # ---------------------------------------------
 
-def _aggregate_concat(outputs: List[str]) -> str:
-    # keep type stable: concatenate branch outputs deterministically
-    return " | ".join(outputs)
-
-
-def _choose_first(outputs: List[str]) -> int:
-    # deterministic: pick first branch
-    return 0
-
-
 def demo_structured_plan(input_text: str) -> None:
+    # Using free builders
     plan = sequence(
         task("strip_ws"),
         task("remove_noise"),
@@ -111,15 +123,29 @@ def demo_structured_plan(input_text: str) -> None:
         choose(task("to_upper"), task("identity")),
     )
 
+    # Using registry-bound builders (same plan)
+    _ = Registry.sequence(
+        Registry.task(strip_ws),
+        Registry.task(remove_noise),
+        Registry.parallel(Registry.task(summarize_head), Registry.task(extract_keywords)),
+        Registry.choose(Registry.task(to_upper), Registry.task("identity")),
+    )
+
     report = run_structured_plan(
         plan,
         Implementation,
         input_value=input_text,
-        aggregate_fn=_aggregate_concat,
-        choose_fn=_choose_first,
+        aggregate_fn=concat(" | "),
+        choose_fn=first(),
         snapshot=True,
     )
     print("[Structured] output:", report.output)
+
+    # Visuals to console (Mermaid)
+    linear = Formal1(("strip_ws", "remove_noise", "normalize_ws"))
+    print(plan_mermaid(linear))
+    print(structured_plan_mermaid(plan))
+    print(exec_gantt_mermaid(report))
 
 
 # ---------------------------------
@@ -158,6 +184,63 @@ def demo_focus_plan(article: Article) -> None:
     print("[Focus] body:", report.output.body)
 
 
+# ---------------------------------
+# Demo 4: Loop + choose (argmax)
+# ---------------------------------
+
+
+def demo_loop_and_choose(input_text: str) -> None:
+    # Loop: repeatedly strip noisy '!!' until none remain, then choose best variant by length
+    def noisy(s: str) -> bool:
+        return "!!" in s
+
+    plan = sequence(
+        loop_while(noisy, task("remove_noise")),
+        choose(task("to_upper"), task("identity")),
+    )
+
+    report = run_structured_plan(
+        plan,
+        Implementation,
+        input_value=input_text,
+        aggregate_fn=None,
+        choose_fn=argmax(lambda s: len(str(s))),
+        snapshot=True,
+    )
+    print("[Loop+Choose] output:", report.output)
+
+
+# ---------------------------------
+# Utilities: write diagrams
+# ---------------------------------
+
+
+def write_diagrams() -> None:
+    out_dir = Path("docs/diagrams")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Linear plan
+    linear = Formal1(("strip_ws", "remove_noise", "normalize_ws"))
+    out_dir.joinpath("Linear__plan.md").write_text("# Plan\n\n" + plan_mermaid(linear), encoding="utf-8")
+
+    # Structured plan + trace
+    plan = sequence(
+        task("strip_ws"),
+        parallel(task("summarize_head"), task("extract_keywords")),
+        choose(task("to_upper"), task("identity")),
+    )
+    report = run_structured_plan(
+        plan,
+        Implementation,
+        input_value="  Hello, Lambda-Cat!!  Agents!  ",
+        aggregate_fn=concat(" | "),
+        choose_fn=first(),
+        snapshot=True,
+    )
+    out_dir.joinpath("Structured__plan.md").write_text("# Structured Plan\n\n" + structured_plan_mermaid(plan), encoding="utf-8")
+    out_dir.joinpath("Structured__trace.md").write_text("# Execution Trace (Gantt)\n\n" + exec_gantt_mermaid(report), encoding="utf-8")
+
+
 def _verify_functor_laws() -> None:
     quick_functor_laws(
         Implementation,
@@ -175,6 +258,13 @@ def main() -> None:
 
     art = Article(title="Note", body="   A Small SAMPLE body, with   noise!!   ")
     demo_focus_plan(art)
+
+    # AgentBuilder + convenience
+    builder = AgentBuilder(Registry.mapping()).with_snapshot(True).with_evaluator(lambda s: -len(s))
+    built = builder.build()
+    # run_seq convenience
+    report = built.run_seq("strip_ws", "normalize_ws", input_value=sample)
+    print("[AgentBuilder] output:", report.output)
 
 
 if __name__ == "__main__":

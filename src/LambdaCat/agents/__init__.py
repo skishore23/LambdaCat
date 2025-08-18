@@ -8,9 +8,11 @@ from .actions import (
 	focus,
 	loop_while,
 	PLAN_MODE,
+    Actions,
 )
 from .runtime import strong_monoidal_functor, call_action, compile_structured_plan
-from .eval import Agent, run_plan, run_structured_plan, choose_best, quick_functor_laws
+from .runtime import concat, first, argmax
+from .eval import Agent, run_plan, run_structured_plan, choose_best, quick_functor_laws, AgentBuilder
 
 __all__ = [
 	"action",
@@ -22,12 +24,17 @@ __all__ = [
 	"focus",
 	"loop_while",
 	"PLAN_MODE",
+    "Actions",
 	"strong_monoidal_functor",
 	"call_action",
 	"compile_structured_plan",
+    "concat",
+    "first",
+    "argmax",
 	"Agent",
 	"run_plan",
 	"run_structured_plan",
 	"choose_best",
 	"quick_functor_laws",
+    "AgentBuilder",
 ]

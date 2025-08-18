@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Protocol
 
 
 def _fence(body: str) -> str:
@@ -11,12 +11,22 @@ def _fence(body: str) -> str:
 
 # ---------------------- Category / Functor / Natural ----------------------
 
-def _iter_arrows(category: Any) -> Iterable[Any]:
+class _ArrowLike(Protocol):
+    source: Any
+    target: Any
+    name: Any
+
+
+class _CategoryLike(Protocol):
+    arrows: Iterable[_ArrowLike]
+
+
+def _iter_arrows(category: Any) -> Iterable[_ArrowLike]:
     # Support our core Cat (.arrows of ArrowGen) and any foreign shape with .morphisms
     if hasattr(category, "arrows"):
-        return category.arrows
+        return category.arrows  # type: ignore[return-value]
     if hasattr(category, "morphisms"):
-        return category.morphisms
+        return category.morphisms  # type: ignore[return-value]
     return ()
 
 
@@ -24,21 +34,21 @@ def _obj_name(x: Any) -> str:
     return x.name if hasattr(x, "name") else str(x)
 
 
-def _src_name(arrow: Any) -> str:
+def _src_name(arrow: _ArrowLike) -> str:
     s = getattr(arrow, "source", "")
     return _obj_name(s)
 
 
-def _tgt_name(arrow: Any) -> str:
+def _tgt_name(arrow: _ArrowLike) -> str:
     t = getattr(arrow, "target", "")
     return _obj_name(t)
 
 
-def _arr_name(arrow: Any) -> str:
+def _arr_name(arrow: _ArrowLike) -> str:
     return _obj_name(getattr(arrow, "name", arrow))
 
 
-def category_mermaid(C: Any, *, hide_id: bool = True) -> str:
+def category_mermaid(C: _CategoryLike | Any, *, hide_id: bool = True) -> str:
     lines: List[str] = ["graph LR"]
     arrows = sorted(_iter_arrows(C), key=lambda a: _arr_name(a))
     for a in arrows:
@@ -75,7 +85,7 @@ def functor_mermaid(F: Any) -> str:
     return _fence(body)
 
 
-def naturality_mermaid(eta: Any, f: Any) -> str:
+def naturality_mermaid(eta: Any, f: _ArrowLike) -> str:
     # Expect 'f' as an arrow-like object with .source/.target names
     X = _src_name(f)
     Y = _tgt_name(f)
@@ -104,6 +114,12 @@ def plan_mermaid(plan: Any) -> str:
     return _fence("\n".join(lines))
 
 
+class _StepLike(Protocol):
+    name: str
+    ok: bool
+    duration_ms: float
+
+
 def exec_gantt_mermaid(report_or_trace: Any) -> str:
     # Accept RunReport with .trace (sequence of StepTrace with duration_ms), or a custom trace with .steps
     steps = None
@@ -113,7 +129,7 @@ def exec_gantt_mermaid(report_or_trace: Any) -> str:
         steps = getattr(report_or_trace, "steps")
     else:
         return _fence("gantt\n  dateFormat X\n  axisFormat %L\n  %% (no steps)")
-    durations = [getattr(s, "duration_ms", None) for s in steps]
+    durations = [getattr(s, "duration_ms", None) for s in steps]  # type: ignore[arg-type]
     if any(d is None for d in durations):
         return _fence("gantt\n  dateFormat X\n  axisFormat %L\n  %% (missing durations)")
     # Build cumulative start/end (ms)
@@ -131,6 +147,90 @@ def exec_gantt_mermaid(report_or_trace: Any) -> str:
         lines.append(f"{name}  :{flag}, step{i+1}, {starts[i]}, {ends[i]}")
     return _fence("\n".join(lines))
 
+
+# ------------------------- Structured Plan visualization -------------------------
+
+
+def _is_task(node: Any) -> bool:
+    return hasattr(node, "name") and isinstance(getattr(node, "name"), str) and not hasattr(node, "items")
+
+
+def _is_sequence(node: Any) -> bool:
+    return hasattr(node, "items") and isinstance(getattr(node, "items"), (list, tuple)) and type(node).__name__ == "Sequence"
+
+
+def _is_parallel(node: Any) -> bool:
+    return hasattr(node, "items") and isinstance(getattr(node, "items"), (list, tuple)) and type(node).__name__ == "Parallel"
+
+
+def _is_choose(node: Any) -> bool:
+    return hasattr(node, "items") and isinstance(getattr(node, "items"), (list, tuple)) and type(node).__name__ == "Choose"
+
+
+def _is_focus(node: Any) -> bool:
+    return hasattr(node, "lens") and hasattr(node, "inner") and type(node).__name__ == "Focus"
+
+
+def _is_loop(node: Any) -> bool:
+    return hasattr(node, "predicate") and hasattr(node, "body") and type(node).__name__ == "LoopWhile"
+
+
+def structured_plan_mermaid(plan: Any) -> str:
+    """Render a structured plan (Task/Sequence/Parallel/Choose/Focus/LoopWhile)."""
+    lines: List[str] = ["flowchart TD"]
+    counter = {"n": 0}
+
+    def nid() -> str:
+        counter["n"] += 1
+        return f"n{counter['n']}"
+
+    def walk(node: Any) -> str:
+        if _is_task(node):
+            node_id = nid()
+            lines.append(f'  {node_id}["task: {getattr(node, "name")}"]')
+            return node_id
+        if _is_sequence(node):
+            seq_id = nid()
+            lines.append(f'  {seq_id}((sequence))')
+            prev = seq_id
+            for child in getattr(node, "items"):
+                cid = walk(child)
+                lines.append(f"  {prev} --> {cid}")
+                prev = cid
+            return seq_id
+        if _is_parallel(node):
+            par_id = nid()
+            lines.append(f'  {par_id}((parallel))')
+            for child in getattr(node, "items"):
+                cid = walk(child)
+                lines.append(f"  {par_id} --> {cid}")
+            return par_id
+        if _is_choose(node):
+            ch_id = nid()
+            lines.append(f'  {ch_id}{{"choose"}}')
+            for child in getattr(node, "items"):
+                cid = walk(child)
+                lines.append(f"  {ch_id} --> {cid}")
+            return ch_id
+        if _is_focus(node):
+            f_id = nid()
+            lines.append(f'  {f_id}[["focus(lens)"]]')
+            cid = walk(getattr(node, "inner"))
+            lines.append(f"  {f_id} --> {cid}")
+            return f_id
+        if _is_loop(node):
+            l_id = nid()
+            lines.append(f'  {l_id}{{"loop_while"}}')
+            cid = walk(getattr(node, "body"))
+            lines.append(f"  {l_id} --> {cid}")
+            lines.append(f"  {cid} --> {l_id}")
+            return l_id
+        raise TypeError(f"Unknown structured plan node: {type(node).__name__}")
+
+    root = walk(plan)
+    lines.append(f"  start(((input))) --> {root}")
+    lines.append(f"  {root} --> end(((output)))")
+    return _fence("\n".join(lines))
 
 # ---------------------------------- 2-cells ---------------------------------
 

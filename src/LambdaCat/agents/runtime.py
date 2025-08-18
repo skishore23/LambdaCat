@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, Generic, List, Mapping, Protocol, Sequence, Tuple, TypeVar
+from typing import Callable, Dict, Generic, List, Mapping, Protocol, Sequence, Tuple, TypeVar
 from LambdaCat.core.fp.kleisli import Kleisli
 from LambdaCat.core.fp.typeclasses import MonadT
 from inspect import signature
@@ -9,6 +9,7 @@ from .actions import Task, Sequence as SeqNode, Parallel, Choose, Focus, LoopWhi
 State = TypeVar("State")
 Ctx = TypeVar("Ctx")
 TState = TypeVar("TState")
+T = TypeVar("T")
 
 
 class Action(Protocol, Generic[State, Ctx]):
@@ -54,8 +55,38 @@ ChooseFn = Callable[[List[State]], int]
 AggregateFn = Callable[[List[State]], State]
 
 
+# -------------------------- Helpers for Par/Choose --------------------------
+
+
+def concat(sep: str = "") -> Callable[[List[str]], str]:
+    def _agg(outputs: List[str]) -> str:
+        # Fail-fast: ensure homogeneous, string-like types; otherwise raise
+        if not outputs:
+            return "" if sep == "" else sep.join([])
+        return sep.join(outputs)
+    return _agg
+
+
+def first() -> Callable[[List[T]], int]:
+    def _choose(outputs: List[T]) -> int:
+        if not outputs:
+            raise AssertionError("choose on empty outputs")
+        return 0
+    return _choose
+
+
+def argmax(by: Callable[[T], float]) -> Callable[[List[T]], int]:
+    def _choose(outputs: List[T]) -> int:
+        if not outputs:
+            raise AssertionError("choose on empty outputs")
+        scores = [by(o) for o in outputs]
+        best = max(range(len(scores)), key=lambda i: scores[i])
+        return best
+    return _choose
+
+
 def _compile_plan(
-    implementation: Mapping[str, Action[Any, Ctx]],
+    implementation: Mapping[str, Action[State, Ctx]],
     plan: Plan[State, Ctx],
     *,
     choose_fn: ChooseFn | None,
@@ -136,7 +167,7 @@ def _compile_plan(
 
 
 def compile_structured_plan(
-    implementation: Mapping[str, Action[Any, Ctx]],
+    implementation: Mapping[str, Action[State, Ctx]],
     plan: Plan[State, Ctx],
     *,
     choose_fn: ChooseFn | None = None,
@@ -145,13 +176,16 @@ def compile_structured_plan(
     return _compile_plan(implementation, plan, choose_fn=choose_fn, aggregate_fn=aggregate_fn)
 
 
+S = TypeVar("S")
+
+
 def compile_plan_kleisli(
-    implementation: Mapping[str, Action[Any, Ctx]],
+    implementation: Mapping[str, Action[S, Ctx]],
     plan: Sequence[str],
     *,
-    monad_pure: Callable[[Any], MonadT[Any]],
+    monad_pure: Callable[[S], MonadT[S]],
     ctx: Ctx | None = None,
-) -> Kleisli[Any, Any]:
+) -> Kleisli[S, S]:
     """Compile a sequential plan of action names into a Kleisli arrow over a monad.
 
     - `implementation`: mapping from action name to `(state, ctx?) -> state`
@@ -161,7 +195,7 @@ def compile_plan_kleisli(
     This compiler is sequential-only; other modes are intentionally unsupported (fail-fast elsewhere).
     """
 
-    def lift_action(name: str) -> Kleisli[Any, Any]:
+    def lift_action(name: str) -> Kleisli[S, S]:
         if name not in implementation:
             raise KeyError(f"Unknown action: {name}")
         fn = implementation[name]
