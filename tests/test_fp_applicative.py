@@ -7,6 +7,7 @@ from hypothesis import given
 
 from LambdaCat.core.fp.instances.identity import Id
 from LambdaCat.core.fp.instances.maybe import Maybe
+from LambdaCat.core.fp.instances.either import Either
 
 
 def int_functions() -> list[Callable[[int], int]]:
@@ -40,4 +41,27 @@ def test_applicative_homomorphism_id(x: int, f: Callable[[int], int]) -> None:
 def test_applicative_homomorphism_maybe(x: int, f: Callable[[int], int]) -> None:
 	assert Maybe.pure(x).ap(Maybe.pure(f)) == Maybe.pure(f(x))
 
+
+
+@given(st.integers())
+def test_applicative_identity_either_right(x: int) -> None:
+	fx: Either[str, int] = Either.right_value(x)
+	assert fx.ap(Either.pure(lambda a: a)) == fx
+
+
+def test_applicative_identity_either_left() -> None:
+	fx: Either[str, int] = Either.left_value("err")
+	assert fx.ap(Either.pure(lambda a: a)) == fx
+
+
+@given(st.integers(), st.sampled_from(int_functions()))
+def test_applicative_homomorphism_either_right(x: int, f: Callable[[int], int]) -> None:
+	assert Either.pure(x).ap(Either.pure(f)) == Either.pure(f(x))
+
+
+def test_applicative_homomorphism_either_left() -> None:
+	# Function on left should propagate left
+	fx: Either[str, int] = Either.right_value(1)
+	ff: Either[str, Callable[[int], int]] = Either.left_value("err")
+	assert fx.ap(ff) == ff  # propagate left
 

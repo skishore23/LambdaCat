@@ -219,3 +219,58 @@ report = run_structured_plan(
 
 All referenced APIs exist in this repository: plan builders (`task`, `sequence`, `parallel`, `loop_while`, `focus`, `lens`), the structured runner, the law suites (`CATEGORY_SUITE`, `FUNCTOR_SUITE`), and Mermaid helpers.
 
+---
+
+## Optional: Effectful composition (Reader/Writer/State/Either via Kleisli)
+
+Most workflows should stay pure. When it improves clarity or robustness, you can compile a sequential plan into a `Kleisli` pipeline over a chosen monad. This keeps actions pure while adding:
+- Reader: implicit config (no manual plumbing)
+- Writer: deterministic logs/metrics
+- State: small evolving counters/caches
+- Either/Maybe: fail fast on invalid inputs
+
+Examples (sketches):
+
+```python
+from LambdaCat.agents.runtime import compile_plan_kleisli
+from LambdaCat.core.fp.kleisli import Kleisli
+from LambdaCat.core.fp.instances.reader import Reader
+
+reader_pipeline = compile_plan_kleisli(actions, ("normalize_query","search_duckduckgo"), monad_pure=lambda s: Reader.pure(s))
+limit_by_env = Kleisli(lambda s: Reader(lambda env: {**s, 'urls': s['urls'][:env['max_results']]}))
+reader_pipeline = reader_pipeline.then(limit_by_env)
+final_state = reader_pipeline.run(initial_state).run({'max_results': 5})
+```
+
+```python
+from LambdaCat.core.fp.instances.writer import Writer
+from LambdaCat.core.fp.typeclasses import Monoid
+
+class ListMonoid(Monoid[list[str]]):
+  def empty(self): return []
+  def combine(self, l, r): return l + r
+
+W = ListMonoid()
+writer_pipeline = compile_plan_kleisli(actions, ("normalize_query",), monad_pure=lambda s: Writer.pure(s, W))
+log_urls = Kleisli(lambda s: Writer(s, [f"urls:{len(s['urls'])}"], W))
+writer_pipeline = writer_pipeline.then(log_urls)
+out = writer_pipeline.run(initial_state)
+```
+
+```python
+from LambdaCat.core.fp.instances.either import Either
+
+either_pipeline = compile_plan_kleisli(actions, ("normalize_query",), monad_pure=lambda s: Either.pure(s))
+validate_query = Kleisli(lambda s: Either.left_value('empty query') if not s['query'].strip() else Either.right_value(s))
+either_pipeline = either_pipeline.then(validate_query)
+result = either_pipeline.run(initial_state)  # Either[str, State]
+```
+
+```python
+from LambdaCat.core.fp.instances.state import State
+
+state_pipeline = compile_plan_kleisli(actions, ("fetch_next",), monad_pure=lambda s: State.pure(s))
+inc_fetch = Kleisli(lambda s: State(lambda st: ({**s, 'fetch_count': s.get('fetch_count', 0)+1}, st)))
+state_pipeline = state_pipeline.then(inc_fetch)
+value, machine = state_pipeline.run(initial_state).run(initial_state)
+```

@@ -37,7 +37,7 @@ Notes:
   - `strong_monoidal_functor(impl)` compiles `Formal1` to `(State, Ctx?) -> State`.
   - `compile_structured_plan(impl, plan, ..., choose_fn?, aggregate_fn?)` returns `(State, Ctx?) -> State`.
 
-If the names feel similar, remember: Task calls an Action. Actions are functions; Tasks are nodes in a plan.
+Task calls an Action. Actions are functions; Tasks are nodes in a plan.
 
 ## Plan tree
 
@@ -147,6 +147,23 @@ plan = loop_while(predicate, sequence(body))
 ```python
 from LambdaCat.agents import quick_functor_laws
 quick_functor_laws({'f': lambda x: x+1, 'g': lambda x: x*2, 'id': lambda x: x}, id_name='id', samples=[0,1,2])
+```
+
+## Effectful pipelines (Kleisli)
+
+- For effectful composition using monads (e.g., `Maybe`, `Either`), see the FP monads doc: [FP Monads](./monads.md).
+- You can compose `A -> M B` arrows ergonomically via `Kleisli`:
+
+```python
+from LambdaCat.core.fp.kleisli import Kleisli
+from LambdaCat.core.fp.instances.maybe import Maybe
+
+parse = Kleisli(lambda s: Maybe(int(s)) if s.isdigit() else Maybe(None))
+recip = Kleisli(lambda n: Maybe(None) if n == 0 else Maybe(1.0 / n))
+pipeline = parse.then(recip)
+
+assert pipeline.run("12") == Maybe(1/12)
+assert pipeline.run("oops") == Maybe(None)
 ```
 
 ## Design constraints

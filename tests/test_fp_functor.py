@@ -7,6 +7,7 @@ from hypothesis import given
 
 from LambdaCat.core.fp.instances.identity import Id
 from LambdaCat.core.fp.instances.maybe import Maybe
+from LambdaCat.core.fp.instances.either import Either
 
 
 def int_functions() -> list[Callable[[int], int]]:
@@ -47,4 +48,32 @@ def test_functor_composition_maybe(x: int | None, g: Callable[[int], int], f: Ca
 	rhs = fx.map(f).map(g)
 	assert lhs == rhs
 
+
+
+@given(st.integers())
+def test_functor_identity_either_right(x: int) -> None:
+	fx: Either[str, int] = Either.right_value(x)
+	assert fx.map(lambda a: a) == fx
+
+
+def test_functor_identity_either_left() -> None:
+	fx: Either[str, int] = Either.left_value("err")
+	assert fx.map(lambda a: a) == fx
+
+
+@given(st.integers(), st.sampled_from(int_functions()), st.sampled_from(int_functions()))
+def test_functor_composition_either_right(x: int, g: Callable[[int], int], f: Callable[[int], int]) -> None:
+	fx: Either[str, int] = Either.right_value(x)
+	lhs = fx.map(lambda a: g(f(a)))
+	rhs = fx.map(f).map(g)
+	assert lhs == rhs
+
+
+def test_functor_composition_either_left() -> None:
+	fx: Either[str, int] = Either.left_value("err")
+	g = lambda x: x + 1
+	f = lambda x: x * 2
+	lhs = fx.map(lambda a: g(f(a)))
+	rhs = fx.map(f).map(g)
+	assert lhs == rhs
 

@@ -5,6 +5,7 @@ from typing import Callable, Generic, Protocol, TypeVar
 
 A = TypeVar("A")
 B = TypeVar("B")
+W = TypeVar("W")
 
 
 class FunctorT(Protocol, Generic[A]):
@@ -53,5 +54,16 @@ def fmap(m: MonadT[A], f: Callable[[A], B]) -> MonadT[B]:
 	if not hasattr(cls, "pure"):
 		raise TypeError("fmap requires a monad class with a 'pure' classmethod")
 	return m.bind(lambda a: cls.pure(f(a)))
+
+
+class Monoid(Protocol, Generic[W]):
+	"""Monoid protocol for Writer logs and similar structures.
+
+	Implementations must provide an identity element and an associative combine.
+	"""
+
+	def empty(self) -> W: ...
+
+	def combine(self, left: W, right: W) -> W: ...
 
 

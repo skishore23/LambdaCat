@@ -1,4 +1,6 @@
 from typing import Any, Callable, Dict, Generic, List, Mapping, Protocol, Sequence, Tuple, TypeVar
+from LambdaCat.core.fp.kleisli import Kleisli
+from LambdaCat.core.fp.typeclasses import MonadT
 from inspect import signature
 from ..core.presentation import Formal1
 from .actions import Task, Sequence as SeqNode, Parallel, Choose, Focus, LoopWhile, Plan
@@ -141,4 +143,35 @@ def compile_structured_plan(
     aggregate_fn: AggregateFn | None = None,
 ):
     return _compile_plan(implementation, plan, choose_fn=choose_fn, aggregate_fn=aggregate_fn)
+
+
+def compile_plan_kleisli(
+    implementation: Mapping[str, Action[Any, Ctx]],
+    plan: Sequence[str],
+    *,
+    monad_pure: Callable[[Any], MonadT[Any]],
+    ctx: Ctx | None = None,
+) -> Kleisli[Any, Any]:
+    """Compile a sequential plan of action names into a Kleisli arrow over a monad.
+
+    - `implementation`: mapping from action name to `(state, ctx?) -> state`
+    - `monad_pure`: constructor for `State -> M State`
+    - `plan`: sequence of action names; evaluated left-to-right via monadic bind
+
+    This compiler is sequential-only; other modes are intentionally unsupported (fail-fast elsewhere).
+    """
+
+    def lift_action(name: str) -> Kleisli[Any, Any]:
+        if name not in implementation:
+            raise KeyError(f"Unknown action: {name}")
+        fn = implementation[name]
+        return Kleisli(lambda s: monad_pure(_call_action_generic(fn, s, ctx)))
+
+    if not plan:
+        return Kleisli(lambda s: monad_pure(s))
+
+    acc = lift_action(plan[0])
+    for step in plan[1:]:
+        acc = acc.then(lift_action(step))
+    return acc
 

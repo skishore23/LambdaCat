@@ -1,57 +1,29 @@
-# LambdaCat FP Monads Plan (RFC)
+# FP Monads (Functor, Applicative, Monad)
 
-## Motivation
 
-LambdaCat already models categories, functors, and natural transformations. Adding the FP trio — Functor, Applicative, Monad — and the Kleisli construction makes effectful composition first-class and law-driven.
+## Design principles
+- Functional and composable: tiny pure dataclasses; orchestration outside core
+- Fail-fast: invalid states raise; no placeholders
+- Strong typing: protocols and frozen dataclasses; mypy --strict friendly
+- Law-centric: small suites validate critical identities
 
-- Predictable composition: laws constrain implementations and catch bugs.
-- Effects as morphisms: Kleisli turns arrows `A -> M B` into a category compatible with `Cat` and existing law suites.
-- Ergonomics: Applicative for independent/parallel composition; Monad for dependent/sequential composition.
+## Modules
+- `typeclasses.py`: `FunctorT`, `ApplicativeT`, `MonadT`, and `fmap(m, f)`
+- `instances/identity.py`: `Id[A]`
+- `instances/maybe.py`: `Maybe[A]` (None as failure)
+- `instances/either.py`: `Either[L, A]` (Left/Right)
+- `instances/reader.py`: `Reader[R, A]` (read-only env)
+- `instances/writer.py`: `Writer[W, A]` (accumulating logs via `Monoid[W]`)
+- `instances/state.py`: `State[S, A]` (state threading)
+- `kleisli.py`: `Kleisli[A,B]` for monadic arrows and `kleisli_identity(pure)`
+- `laws.py`: minimal law suites (Functor/Applicative identity, Monad right identity)
+- `__init__.py`: thin re-exports
 
-## Scope
-
-- Typeclasses: FP-style `Functor`, `Applicative`, `Monad` as Protocols (no clash with categorical `Functor`).
-- Instances: `Id`, `Maybe` (Phase 1). `Either`, `Reader`, `Writer`, `State`, `ListM` (Phase 3).
-- Law suites: Functor/Applicative/Monad laws using existing `LawSuite` engine (Phase 1).
-- Kleisli: Build `Kl(M)` as a `Cat` for any `Monad` (Phase 4).
-- Do-notation helper (Phase 5, optional).
-
-Out of scope for initial phases: transformers/free monad; heavy dependencies; runtime magic.
-
-## Design Overview
-
-- Keep categorical core unchanged under `src/LambdaCat/core/`.
-- Introduce FP constructs under `src/LambdaCat/core/fp/` to avoid name clashes and preserve modularity.
-- Raise explicit exceptions on invalid states; no silent fallbacks.
-- Strong typing: mypy --strict, explicit generics; avoid Any except at Protocol boundaries.
-
-### Module Layout
-
-- `src/LambdaCat/core/fp/typeclasses.py`
-  - Protocols: `FunctorT[A]`, `ApplicativeT[A]`, `MonadT[A]`.
-  - Small helpers: `fmap(monad_like, f)` (implemented via `bind`/`pure`).
-- `src/LambdaCat/core/fp/instances/identity.py`
-  - `Id[A]`: `pure`, `map`, `ap`, `bind`.
-- `src/LambdaCat/core/fp/instances/maybe.py`
-  - `Maybe[A]` with `None` representing failure; `pure`, `map`, `ap`, `bind`.
-- `src/LambdaCat/core/fp/laws.py`
-  - Functor laws (identity, composition).
-  - Applicative laws (identity, homomorphism, interchange, composition).
-  - Monad laws (left/right identity, associativity).
-- `src/LambdaCat/core/fp/kleisli.py`
-  - Builder for `Kl(M)` as a `Cat` using monadic composition.
-- `src/LambdaCat/core/fp/do.py` (optional)
-  - Minimal helper for sequencing monadic code ergonomically.
-- `src/LambdaCat/core/fp/__init__.py`
-  - Thin re-exports; no heavy imports.
-
-No imports from `extras/` or `plugins/` in core.
-
-## APIs (precise; strongly typed)
+## APIs
 
 ```python
-# src/LambdaCat/core/fp/typeclasses.py
-from typing import Callable, Generic, Protocol, TypeVar
+# typeclasses.py
+from typing import Callable, Protocol, TypeVar, Generic
 
 A = TypeVar("A"); B = TypeVar("B")
 
@@ -66,18 +38,16 @@ class ApplicativeT(FunctorT[A], Protocol, Generic[A]):
 class MonadT(ApplicativeT[A], Protocol, Generic[A]):
     def bind(self, f: Callable[[A], "MonadT[B]"]) -> "MonadT[B]": ...
 
-# Helper built in terms of bind/pure; raises if required methods are missing
 def fmap(m: MonadT[A], f: Callable[[A], B]) -> MonadT[B]:
     return m.bind(lambda a: type(m).pure(f(a)))
 ```
 
-### Instances (Phase 1)
+### Instances
 
 ```python
-# src/LambdaCat/core/fp/instances/identity.py
+# instances/identity.py
 from dataclasses import dataclass
 from typing import Callable, Generic, TypeVar
-
 A = TypeVar("A"); B = TypeVar("B")
 
 @dataclass(frozen=True)
@@ -91,10 +61,9 @@ class Id(Generic[A]):
 ```
 
 ```python
-# src/LambdaCat/core/fp/instances/maybe.py
+# instances/maybe.py
 from dataclasses import dataclass
 from typing import Callable, Generic, Optional, TypeVar
-
 A = TypeVar("A"); B = TypeVar("B")
 
 @dataclass(frozen=True)
@@ -111,69 +80,132 @@ class Maybe(Generic[A]):
         return Maybe(None) if self.value is None else f(self.value)
 ```
 
-### Kleisli Category
+```python
+# instances/either.py
+from dataclasses import dataclass
+from typing import Callable, Generic, Optional, TypeVar
+L = TypeVar("L"); A = TypeVar("A"); B = TypeVar("B")
 
-- Objects: names of types/states (strings).
-- Morphisms: named arrows with semantics `A -> M B` (Python callables returning `MonadT`).
-- Composition: `(g ∘ f)(a) = f(a).bind(g)`.
-- Identity on `A`: `lambda a: M.pure(a)`.
-- Build a `Cat` using existing `Presentation`/`Cat` data model and validate with `CATEGORY_SUITE`.
+@dataclass(frozen=True)
+class Either(Generic[L, A]):
+    left: Optional[L]
+    right: Optional[A]
+    def __post_init__(self) -> None:
+        if (self.left is None) == (self.right is None):
+            raise ValueError("Either must have exactly one of (left, right) set")
+    @classmethod
+    def left_value(cls, e: L) -> "Either[L, A]": return Either(left=e, right=None)
+    @classmethod
+    def right_value(cls, a: A) -> "Either[L, A]": return Either(left=None, right=a)
+    @classmethod
+    def pure(cls, x: A) -> "Either[L, A]": return Either(left=None, right=x)
+    def map(self, f: Callable[[A], B]) -> "Either[L, B]":
+        return self if self.right is None else Either(left=None, right=f(self.right))
+    def ap(self, ff: "Either[L, Callable[[A], B]]") -> "Either[L, B]":
+        if self.left is not None: return Either(left=self.left, right=None)
+        if ff.left is not None: return Either(left=ff.left, right=None)
+        assert self.right is not None and ff.right is not None
+        return Either(left=None, right=ff.right(self.right))
+    def bind(self, f: Callable[[A], "Either[L, B]"]) -> "Either[L, B]":
+        return self if self.right is None else f(self.right)
+```
+
+### Kleisli
+
+```python
+# kleisli.py
+from dataclasses import dataclass
+from typing import Callable, Generic, TypeVar
+from .typeclasses import MonadT
+A = TypeVar("A"); B = TypeVar("B"); C = TypeVar("C")
+
+@dataclass(frozen=True)
+class Kleisli(Generic[A, B]):
+    run: Callable[[A], MonadT[B]]
+    def then(self, g: "Kleisli[B, C]") -> "Kleisli[A, C]":
+        return Kleisli(lambda a: self.run(a).bind(g.run))
+
+def kleisli_identity(pure: Callable[[A], MonadT[A]]) -> Kleisli[A, A]:
+    return Kleisli(lambda a: pure(a))
+
+# Optional builder for a structural category of the Kleisli graph (names only)
+def kleisli_category(name: str, objects: Tuple[str,...], morphisms: Mapping[str, Tuple[str,str]], compose_semantics: Mapping[Tuple[str,str], str]) -> Cat:
+    ...
+```
+
+## Usage
+
+- Functor map
+```python
+from LambdaCat.core.fp.instances.maybe import Maybe
+Maybe(10).map(lambda n: n * 2)          # Maybe(20)
+Maybe(None).map(lambda n: n * 2)        # Maybe(None)
+```
+
+- Applicative ap
+```python
+from LambdaCat.core.fp.instances.maybe import Maybe
+add = lambda a: (lambda b: a + b)
+Maybe(3).ap(Maybe.pure(lambda x: x + 1))   # Maybe(4)
+Maybe(2).ap(Maybe.pure(add(5)))            # Maybe(7)
+```
+
+- Monad bind
+```python
+from LambdaCat.core.fp.instances.maybe import Maybe
+def safe_div(a: int, b: int) -> Maybe[int]:
+    return Maybe(None) if b == 0 else Maybe(a // b)
+Maybe(100).bind(lambda n: safe_div(n, 2)).bind(lambda n: safe_div(n, 5))  # Maybe(10)
+```
+
+- Either for explicit errors
+```python
+from LambdaCat.core.fp.instances.either import Either
+parse = lambda s: Either.left_value("bad") if not s.isdigit() else Either.right_value(int(s))
+recip = lambda n: Either.left_value("zero") if n == 0 else Either.right_value(1.0 / n)
+parse("42").bind(recip)  # Right(1/42)
+```
+
+- Kleisli composition
+```python
+from LambdaCat.core.fp.kleisli import Kleisli, kleisli_identity
+from LambdaCat.core.fp.instances.maybe import Maybe
+
+parse = Kleisli(lambda s: Maybe(int(s)) if s.isdigit() else Maybe(None))
+recip = Kleisli(lambda n: Maybe(None) if n == 0 else Maybe(1.0 / n))
+pipeline = parse.then(recip)
+pipeline.run("12")   # Maybe(1/12)
+pipeline.run("oops") # Maybe(None)
+```
+
+- Reader/Writer/State sketches
+```python
+from LambdaCat.core.fp.instances.reader import Reader
+ask = Reader(lambda env: env)                  # A: read env
+uppercase = Reader(lambda env: env.upper())    # map over env via Reader
+
+from LambdaCat.core.fp.instances.writer import Writer
+class ListMonoid:
+    def empty(self): return []
+    def combine(self, l, r): return l + r
+W = ListMonoid()
+Writer.pure(1, W).tell(["start"]).map(lambda x: x+1)  # value=2, log=["start"]
+
+from LambdaCat.core.fp.instances.state import State
+inc = State(lambda s: (None, s+1))
+get = State(lambda s: (s, s))
+program = get.bind(lambda n: State(lambda s: (n, s)))  # trivial pass-through
+```
 
 ## Laws
 
-- Implement as `Law` instances within `src/LambdaCat/core/fp/laws.py`, using existing `LawSuite` runner.
-- No random I/O; property tests pass generators via config or Hypothesis strategies in tests.
+Defined in `src/LambdaCat/core/fp/laws.py` and assembled into suites:
+- Functor: Identity
+- Applicative: Identity
+- Monad: Right Identity
 
-Functor laws:
-- `map(id) == id`
-- `map(g ∘ f) == map(g) ∘ map(f)`
+Additional properties are covered by tests in `tests/test_fp_*`.
 
-Applicative laws:
-- identity, homomorphism, interchange, composition
-
-Monad laws:
-- left identity, right identity, associativity
-
-## Tests
-
-- `tests/test_fp_functor.py`: Functor laws for `Id`, `Maybe`.
-- `tests/test_fp_applicative.py`: Applicative laws for `Id`, `Maybe`.
-- `tests/test_fp_monad.py`: Monad laws for `Id`, `Maybe`.
-- `tests/test_kleisli.py`: `Kl(M)` satisfies category identities/associativity via `CATEGORY_SUITE` on finite examples.
-
-Use Hypothesis for property tests; keep strategies small and deterministic where possible to avoid flaky CI.
-
-## Integration Notes
-
-- Do not modify `core/functor.py` (categorical functors). FP constructs live under `core/fp/`.
-- No imports from `extras/` or `plugins/` inside `core/fp/`.
-- Thin re-exports from `src/LambdaCat/core/__init__.py` are optional; prefer keeping `fp` namespaced.
-
-## Phases and Deliverables
-
-- Phase 1
-  - Files: `typeclasses.py`, `instances/identity.py`, `instances/maybe.py`, `laws.py`.
-  - Tests: functor/applicative/monad laws for Id/Maybe.
-- Phase 2
-  - `kleisli.py` and tests integrating with `CATEGORY_SUITE`.
-- Phase 3
-  - Instances: `Either`, `Reader`, `Writer` (with `Monoid` Protocol for `W`), `State`, `ListM`.
-  - Expand tests and law coverage.
-- Phase 4
-  - Optional `do.py` helper and docs/examples.
-
-Each phase must pass: ruff, mypy --strict, pytest suites.
-
-## Acceptance Criteria
-
-- Strong typing: no Any in public APIs; Protocols define exact shapes.
-- Fail-fast: explicit exceptions on invalid states; no silent fallbacks.
-- Law-sound: all law suites pass for included instances.
-- Category integration: `Kl(M)` categories satisfy `CATEGORY_SUITE`.
-- Isolation: no cross-imports from `extras/`/`plugins/` into core.
-
-## Risks / Mitigations
-
-- Name collision with categorical `Functor`: avoid by `core/fp/` namespacing and `*T` suffix.
-- Overreach in first PR: phase deliverables are small and independently valuable.
-- Property-test flakiness: control strategy sizes; cap Hypothesis settings in CI.
+## Notes
+- FP constructs are isolated under `core/fp/`; categorical functors are in `core/functor.py`.
+- No imports from `extras/` or `plugins/` inside core.
