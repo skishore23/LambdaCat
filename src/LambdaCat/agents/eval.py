@@ -173,6 +173,27 @@ class Agent(Generic[State, Ctx]):
     def run_seq(self, *names: str, input_value: State, ctx: Ctx | None = None) -> RunReport[State]:
         return self.run(self.plan(*names), input_value, ctx=ctx)
 
+    def run_structured(
+        self,
+        plan: "Plan[State, Ctx]",
+        input_value: State,
+        *,
+        ctx: Ctx | None = None,
+        choose_fn: Callable[[List[State]], int] | None = None,
+        aggregate_fn: Callable[[List[State]], State] | None = None,
+        snapshot: bool | None = None,
+    ) -> RunReport[State]:
+        snap = self.snapshot if snapshot is None else snapshot
+        return run_structured_plan(
+            plan,
+            self.implementation,
+            input_value,
+            ctx=ctx,
+            choose_fn=choose_fn,
+            aggregate_fn=aggregate_fn,
+            snapshot=snap,
+        )
+
 
 # ------------------------------ Agent Builder ------------------------------
 

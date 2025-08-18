@@ -73,6 +73,9 @@ plan = actions.sequence(
 agent = AgentBuilder(actions.mapping()).with_snapshot(True).build()
 report = run_structured_plan(plan, actions.mapping(), input_value='  Hello Lambda-Cat  ', aggregate_fn=concat(' | '))
 print(report.output)
+ 
+# Or via Agent convenience:
+# report = agent.run_structured(plan, input_value='  Hello Lambda-Cat  ', aggregate_fn=concat(' | '))
 ```
 
 ## Define actions (manual mapping)
