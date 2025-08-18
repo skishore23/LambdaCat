@@ -1,0 +1,12 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: LambdaCat
+Upstream-Contact: shimikeri.kishore@gmail.com
+Source: https://github.com/skishore23/LambdaCat
+
+Files: *
+Copyright: 2025 HyAGAI
+License: LicenseRef-HNCL-1.0
+
+License: LicenseRef-HNCL-1.0
+ See LICENSES/LicenseRef-HNCL-1.0.txt
+

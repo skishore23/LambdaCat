@@ -7,7 +7,7 @@ name = "LambdaCat"
 version = "0.1.0"
 description = "LambdaCat: functional core for categories with pluginable extras"
 authors = ["You <you@example.com>"]
-license = "MIT"
+license = "LicenseRef-HNCL-1.0"
 readme = "README.md"
 packages = [{ include = "LambdaCat", from = "src" }]
 keywords = ["category-theory", "functional", "dsl"]
@@ -16,7 +16,7 @@ repository = "https://github.com/yourorg/LambdaCat"
 documentation = "https://github.com/yourorg/LambdaCat#readme"
 classifiers = [
   "Programming Language :: Python :: 3",
-  "License :: OSI Approved :: MIT License",
+  "License :: Other/Proprietary License",
   "Typing :: Typed",
 ]
 

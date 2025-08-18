@@ -1,3 +1,5 @@
 include README.md LICENSE
+recursive-include LICENSES *
+include .reuse/dep5
 recursive-include src/LambdaCat *.py
 include src/LambdaCat/py.typed
