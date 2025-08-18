@@ -4,7 +4,7 @@
 
 # 🐾 LambdaCat
 
-> A  composable agents framework grounded in category theory—strongly typed, and equipped with suites for laws and proof‑like checks.
+> Composable agents on a typed categorical core: objects, functors, naturality, and runtime law checks.
 
 ## ✨ Features
 
@@ -34,13 +34,30 @@ Use it for:
 
 ---
 
-## Advantages
+## Why LambdaCat?
 
-- Composability with correctness: plans compose like morphisms; interpreters respect identities and composition, and suites check the laws.
-- Fewer silent failures: strong typing and fail‑fast checks surface mistakes early (missing maps, bad compositions, invalid plans).
-- Verifiable behavior: laws and proof‑like checks (naturality, associativity, identities) give mathematical confidence beyond unit tests.
-- Traceable agents: every run yields a structured trace suitable for debugging, benchmarking, or audit.
-- Clean separation of concerns: a minimal categorical core with opt‑in extras keeps research and production surfaces small and predictable.
+- Confidence by construction: executable law checks for categories, functors, and naturality you can run in tests/CI.
+- Composability that scales: a strong‑monoidal runtime interprets plans as pipelines; build with `sequence`, `parallel`, `choose`, `focus`, and `loop_while`.
+- Small, typed surface: minimal dataclasses and explicit maps; easy to read, reason about, and extend.
+- Traceable runs: per‑step timings and optional snapshots for debugging and auditing.
+- Diagram‑ready: generate Mermaid graphs for categories, functors, naturality squares, plans, and execution Gantt.
+- Zero heavy deps by default: core stays lean; extras/plugins are opt‑in.
+
+---
+
+## 🧮 Type‑theoretic stance
+
+- **Positioning**
+  - **λ→ (simply typed)**: core APIs are STLC‑like, pure, and law‑centric.
+  - **λ2 (polymorphism)**: parametric generics via `typing`/`TypeVar`; suites enforce identity/associativity/naturality akin to parametricity guarantees.
+  - **λω (type operators)**: approximated with Python generics; no higher‑kinded types; we avoid emulation hacks.
+  - **λP (dependent types)**: out of scope for Python; we do not simulate dependent typing in core.
+- **Implications**
+  - **Fail‑fast boundaries**: no ad‑hoc runtime type dispatch in core; keep functions small, pure, and parametric.
+  - **Proof surface**: categorical laws are checked by suites; deeper dependent proofs live in external proof assistants (linked from docs if needed).
+  - **Scope control**: avoid pseudo‑dependent encodings; if research needs them, they belong in extras/docs, never imported by core.
+- **Why this helps**
+  - **Clarity** and **maintainability**: communicates boundaries, prevents fragile designs, and keeps the core minimal and law‑centric.
 
 ---
 
@@ -49,7 +66,6 @@ Use it for:
 Create a virtual environment and install the package locally (no publishing required):
 
 ```bash
-cd LambdaCat
 python -m venv .venv
 source ./.venv/bin/activate
 pip install -U pip
@@ -83,7 +99,7 @@ print(report.output)      # [ABC]
 print(report.score)       # e.g., 5
 ```
 
-Structured plans with explicit composition and fail-fast invariants:
+Structured plans with explicit composition and invariants:
 
 ```python
 from LambdaCat.agents.actions import task, sequence, parallel, choose
@@ -221,10 +237,10 @@ from LambdaCat.core.presentation import Formal1
 from LambdaCat.agents.runtime import strong_monoidal_functor
 
 actions = {
-  'denoise': lambda s: s.replace('~',''),
-  'edges':   lambda s: ''.join(ch for ch in s if ch.isalpha()),
-  'segment': lambda s: s.upper(),
-  'merge':   lambda s: f"[{s}]",
+  'denoise': lambda s, ctx=None: s.replace('~',''),
+  'edges':   lambda s, ctx=None: ''.join(ch for ch in s if ch.isalpha()),
+  'segment': lambda s, ctx=None: s.upper(),
+  'merge':   lambda s, ctx=None: f"[{s}]",
 }
 
 plan = Formal1(('denoise','edges','segment','merge'))
@@ -249,7 +265,7 @@ More tutorials and notebooks coming soon.
     - `Parallel`: run child plans in parallel and aggregate outputs via an explicit `aggregate_fn`.
     - `Choose`: evaluate child plans and select one by an explicit `choose_fn` (or evaluator wiring at the agent layer).
   - Builders: `task(name)`, `sequence(...)`, `parallel(..., aggregate_fn=...)`, `choose(..., choose_fn=...)`.
-  - Strict invariants: `Parallel` requires an aggregator; `Choose` requires a chooser; both validated fail-fast.
+  - Strict invariants: `Parallel` requires an aggregator; `Choose` requires a chooser.
 
 - Focused transforms with lenses
   - `Lens[S, A]` to zoom into a substate; `focus(lens, plan)` composes inner plans on `A` and lifts back to `S` immutably.

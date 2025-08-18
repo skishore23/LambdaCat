@@ -21,7 +21,7 @@ print(report.to_text())
 
 ```python
 from LambdaCat.core.proofs import (
-  AxReport, check_category_axioms, is_terminal_object, is_product, is_iso, check_simplex_thin, certificate
+  check_category_axioms, is_terminal_object, is_product, is_iso, check_simplex_thin, certificate
 )
 
 rep_cat = check_category_axioms(C)

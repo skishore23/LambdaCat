@@ -8,12 +8,8 @@ from .laws import Law, LawResult, Violation, LawSuite
 
 
 def _composable(C: Cat, f: str, g: str) -> bool:
-	try:
-		# Compose g ∘ f means (g,f) key
-		C.compose(f, g)  # will raise if not defined
-		return True
-	except Exception:
-		return False
+	# Compose g ∘ f means (g,f) key in the composition table
+	return (g, f) in C.composition
 
 
 @dataclass(frozen=True)

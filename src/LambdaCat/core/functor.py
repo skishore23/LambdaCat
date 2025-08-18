@@ -68,7 +68,7 @@ class FunctorBuilder:
 
 		F = CatFunctor(self.name, self.source, self.target, dict(self._obj), dict(self._mor))
 
-		# Law checks: identities and composition preservation (fail-fast)
+		# Law checks: identities and composition preservation
 		for obj_name, id_src in self.source.identities.items():
 			FX = F.object_map[obj_name]
 			id_tgt = self.target.identities[FX]

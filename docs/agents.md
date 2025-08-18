@@ -87,8 +87,7 @@ best_plan, best_report = choose_best(
 ## Structured plans (Sequence / Parallel / Choose)
 
 ```python
-from LambdaCat.agents.actions import task, sequence, parallel, choose, lens, focus, loop_while
-from LambdaCat.agents.eval import run_structured_plan
+from LambdaCat.agents import task, sequence, parallel, run_structured_plan
 
 structured = sequence(
   task('denoise'),
@@ -100,22 +99,21 @@ report = run_structured_plan(
   structured,
   actions,
   input_value="~a~b_c-1",
-  aggregate_fn=lambda outs: ''.join(outs),   # combine Parallel outputs
-  choose_fn=None,                            # not used here
-  snapshot=True,
+  aggregate_fn=lambda outs: ''.join(outs),
 )
 print(report.output)
 ```
 
 ```python
 # Choose example: pick best branch by a custom chooser
+from LambdaCat.agents import choose
+
 branching = choose(task('segment'), task('merge'))
 best = run_structured_plan(
   branching,
   actions,
   input_value="ab",
   choose_fn=lambda outs: max(range(len(outs)), key=lambda i: len(str(outs[i]))),
-  aggregate_fn=None,
 )
 print(best.output)
 ```

@@ -1,17 +1,28 @@
 # LambdaCat — Functional Core for Applied Category Theory
 
-> A tiny, law-safe core for categories with optional layers for functors, natural transformations, (strict) 2-cells. Built for practical agent pipelines with mathematical guarantees—without making users learn all of category theory.
+> Composable agents on a typed categorical core: objects, functors, naturality, and runtime law checks.
 
 ---
 
 ## TL;DR
 
 * **Core:** immutable `Obj`, `Cat`, explicit `composition` and `identities`, builder helpers, law suites.
-* **Structure:** optional plugins later (Tamari/associahedron/MCTS).
+* **Plugins:** stubs only (e.g., Tamari placeholder); no features are enabled by default.
 * **Agents:** plans as formal words → mapped to real Python callables by a strong-monoidal runtime; scoring + traces; choose best plan.
 * **Laws:** extensible law engine → suites for categories; proofs helpers for universal properties.
 * **Viz:** automatic **Mermaid** exporters for categories, functors, naturality squares, plans, and execution Gantt.
 * **Packaging:** pip-installable core.
+
+---
+
+## Why LambdaCat?
+
+- Confidence by construction: executable law checks for categories, functors, and naturality you can run in tests/CI.
+- Composability that scales: a strong‑monoidal runtime interprets plans as pipelines; build with `sequence`, `parallel`, `choose`, `focus`, and `loop_while`.
+- Small, typed surface: minimal dataclasses and explicit maps; easy to read, reason about, and extend.
+- Traceable runs: per‑step timings and optional snapshots for debugging and auditing.
+- Diagram‑ready: generate Mermaid graphs for categories, functors, naturality squares, plans, and execution Gantt.
+- Zero heavy deps by default: core stays lean; extras/plugins are opt‑in.
 
 ---
 
@@ -21,40 +32,6 @@ Core only (no heavy deps):
 
 ```bash
 pip install LambdaCat
-```
-
----
-
-## Repository Layout (src layout)
-
-```
-src/
-  LambdaCat/
-    __init__.py
-    py.typed
-    core/
-      __init__.py
-      presentation.py     # Obj, ArrowGen, Formal1, Presentation
-      category.py         # Cat (identities, composition table)
-      builder.py          # obj(), arrow(), build_presentation()
-      ops.py              # identity(), compose(), normalize() over Formal1
-      functor.py          # FunctorBuilder, CatFunctor (id & comp checks)
-      natural.py          # Natural + check_naturality()
-      laws.py             # generic law engine (Law, LawSuite, run_suite)
-      laws_category.py    # identity + associativity suite for Cat
-      laws_functor.py     # functor identities + composition suite (reports)
-      standard.py         # terminal, discrete, simplex Δⁿ, walking isomorphism
-      ops_category.py     # opposite_category(C)
-    extras/
-      viz_mermaid.py      # Mermaid exporters + render_all()
-    plugins/
-      tamari/             # (future)
-      ...
-    agents/
-      __init__.py
-      actions.py          # Plan nodes (Task/Sequence/Parallel/Choose/Focus/LoopWhile); builders
-      runtime.py          # strong_monoidal_functor; structured plan interpreter
-      eval.py             # Agent wrapper (run, choose_best, quick_functor_laws)
 ```
 
 ---
@@ -285,38 +262,4 @@ gantt
 - Property/meta-morphic tests for robustness
 
 ---
-
-
-## 🔭 Future upgrade: n-categories
-
-- Guiding principles
-  - Keep the 1-category core unchanged (`src/LambdaCat/core/{presentation.py, category.py, ops.py, functor.py, natural.py, laws_*.py}`).
-  - Add higher-dimensional code in new modules; pure functions only; fail-fast checks.
-
-- Data model (strict n-cats as computads)
-  - Generators per dimension (k-cells), boundary maps, and formal composites.
-  - Validate boundaries at composition time; no placeholder fallbacks.
-
-- Package layout (new)
-  - `src/LambdaCat/core/ncat/`: `presentation_n.py`, `ops_n.py`, `functor_n.py`, `laws_ncategory.py`, `convert_n.py`.
-
-- Laws and checks
-  - Suites per k for units/associativity; 2D interchange; aggregate `NCATEGORY_SUITE(n)`.
-
-- Phase 1: strict 2-categories
-  - Operations: `vcompose2`, `hcompose2`, whiskering, identities `id2(f)`.
-  - Laws: unit/assoc for vertical; functoriality of horizontal; strict interchange.
-
-- Visualization (optional)
-  - Extend `extras/viz_mermaid.py` with whiskering/hcomp helpers; extras remain opt-in.
-
-- Testing
-  - New tests alongside existing suites (no API breaks); property/meta tests for boundaries.
-
-
-## Roadmap
-
-1. Ops: product/slice with universal property checkers
-2. Plugins: Tamari/associahedron/MCTS search
-3. Adapters: natural transformations as action adapters
-4. Serialization: stable JSON for plans and small cats
+ 

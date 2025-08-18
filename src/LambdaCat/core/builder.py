@@ -28,7 +28,18 @@ def build_presentation(
 	relations: Iterable[tuple[Formal1, Formal1]] = (),
 ) -> Presentation:
 	objs: Tuple[Obj, ...] = tuple(objects)
-	gens: Tuple[ArrowGen, ...] = tuple(arrows) + _identities_for(objs)
+	# Validate unique object names
+	obj_names = [o.name for o in objs]
+	if len(set(obj_names)) != len(obj_names):
+		raise ValueError("Duplicate object name detected")
+	# Validate arrow endpoints and reserved identity namespace on provided arrows
+	base_arrows: Tuple[ArrowGen, ...] = tuple(arrows)
+	for a in base_arrows:
+		if a.source not in obj_names or a.target not in obj_names:
+			raise ValueError(f"Arrow endpoint not found among objects: {a}")
+		if a.name.startswith("id:"):
+			raise ValueError(f"Arrow name conflicts with reserved identity namespace: {a.name}")
+	gens: Tuple[ArrowGen, ...] = base_arrows + _identities_for(objs)
 	_names = set()
 	for g in gens:
 		if g.name in _names:

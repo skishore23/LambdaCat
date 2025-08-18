@@ -27,3 +27,5 @@ venv/
 .venv
 
 .cursorrules
+
+.hypothesis/

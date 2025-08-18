@@ -43,7 +43,6 @@ def run_plan(
     evaluator: Callable[[State], Score] | None = None,
     snapshot: bool = False,
 ) -> RunReport[State]:
-    F = strong_monoidal_functor(implementation)
     value = input_value
     traces: List[StepTrace[State]] = []
     for step in plan.factors:

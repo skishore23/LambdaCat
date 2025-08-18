@@ -20,20 +20,40 @@ def check_naturality(eta: Natural) -> None:
 		raise AssertionError("Functors must have same source/target for naturality")
 	S: Cat = F.source
 	T: Cat = F.target
-	# Build arrow index for source to get endpoints
-	name_to_arrow = {a.name: a for a in S.arrows}
 	for a in S.arrows:
 		f = a.name
 		X = a.source
 		Y = a.target
-		if X not in eta.components or Y not in eta.components:
-			raise AssertionError(f"Missing natural component for object {X or Y}")
+		if X not in eta.components:
+			raise AssertionError(f"Missing natural component for object {X}")
+		if Y not in eta.components:
+			raise AssertionError(f"Missing natural component for object {Y}")
 		eta_X = eta.components[X]
 		eta_Y = eta.components[Y]
 		Ff = F.morphism_map.get(f)
 		Gf = G.morphism_map.get(f)
 		if Ff is None or Gf is None:
 			raise AssertionError(f"Functor not defined on morphism {f}")
+		# Validate component arrows exist and have correct typing in target
+		try:
+			eta_X_arrow = next(ax for ax in T.arrows if ax.name == eta_X)
+			eta_Y_arrow = next(ay for ay in T.arrows if ay.name == eta_Y)
+		except StopIteration:
+			raise AssertionError(f"Missing component arrow in target for η_{X} or η_{Y}")
+		FX = F.object_map.get(X)
+		GX = G.object_map.get(X)
+		FY = F.object_map.get(Y)
+		GY = G.object_map.get(Y)
+		if FX is None or GX is None or FY is None or GY is None:
+			raise AssertionError("Functor object maps incomplete for naturality check")
+		if not (eta_X_arrow.source == FX and eta_X_arrow.target == GX):
+			raise AssertionError(
+				f"η_{X} has wrong type: expected {FX}->{GX}, got {eta_X_arrow.source}->{eta_X_arrow.target}"
+			)
+		if not (eta_Y_arrow.source == FY and eta_Y_arrow.target == GY):
+			raise AssertionError(
+				f"η_{Y} has wrong type: expected {FY}->{GY}, got {eta_Y_arrow.source}->{eta_Y_arrow.target}"
+			)
 		# Check η_Y ∘ F(f) == G(f) ∘ η_X in target category
 		try:
 			left = T.compose(eta_Y, Ff)

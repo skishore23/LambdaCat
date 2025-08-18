@@ -12,9 +12,7 @@ def identity(name: str) -> Formal1:
 def compose(*paths: Formal1) -> Formal1:
 	if not paths:
 		raise ValueError("compose requires at least one path")
-	factors: Tuple[str, ...] = tuple().__add__(())
-	for p in paths:
-		factors = factors + p.factors
+	factors: Tuple[str, ...] = tuple(f for p in paths for f in p.factors)
 	return Formal1(factors)
 
 

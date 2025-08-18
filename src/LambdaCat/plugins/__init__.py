@@ -1,4 +1,4 @@
-"""Plugin registry (empty, fail-fast by default)."""
+"""Plugin registry (empty; disabled by default)."""
 
 def require_plugin(name: str) -> None:
 	raise RuntimeError(

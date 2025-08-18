@@ -15,10 +15,17 @@ class _FunctorIds(Law[CatFunctor]):
         V: List[Violation] = []
         S, T = F.source, F.target
         for X in S.objects:
-            id_src = S.identities[X.name] if isinstance(S.identities, dict) else S.identities[X]
-            id_tgt = T.identities[F.object_map[X.name]] if isinstance(T.identities, dict) else T.identities[F.object_map[X]]
+            id_src = S.identities[X.name]
+            FX = F.object_map.get(X.name)
+            if FX is None:
+                V.append(Violation(self.name, f"missing object map for {X.name}", {"X": X.name}))
+                continue
+            id_tgt = T.identities.get(FX)
+            if id_tgt is None:
+                V.append(Violation(self.name, f"missing identity in target for {FX}", {"FX": FX}))
+                continue
             if F.morphism_map.get(id_src) != id_tgt:
-                V.append(Violation(self.name, f"F(id_{X.name}) ≠ id_{F.object_map.get(X.name, X)}", {"X": X.name}))
+                V.append(Violation(self.name, f"F(id_{X.name}) ≠ id_{FX}", {"X": X.name}))
         return LawResult(self.name, passed=(len(V) == 0), violations=V)
 
 

@@ -1,6 +1,6 @@
 # Core (deep dive)
 
-Minimal, functional, law‑centric core. No side‑effects; fail‑fast on invalid state. Everything composes via small typed dataclasses and plain dictionaries.
+Minimal, functional, law‑centric core. No side effects. Everything composes via small typed dataclasses and plain dictionaries.
 
 ## Design principles
 - Functional and composable: tiny pure functions; orchestration at the edges
@@ -48,7 +48,7 @@ API:
 - `arrow(name, source, target) -> ArrowGen`
 - `build_presentation(objects, arrows, relations=()) -> Presentation`
   - Adds identities `id:<ObjName>` for every object
-  - Validates duplicate arrow names and raises `ValueError` on conflict
+  - Validates duplicate object/arrow names, reserved `id:` namespace, and arrow endpoints
 
 Invariants:
 - Identity arrows are always present in returned `Presentation`
@@ -144,6 +144,7 @@ Purpose: JSON‑ish serialization helpers for presentations.
 API:
 - `to_dict(p: Presentation) -> Dict[str, Any]`
 - `from_dict(d: Dict[str, Any]) -> Presentation`
+  - Validates unique object/arrow names, arrow endpoints, and relation references
 
 Notes:
 - Only presentations, not `Cat` (since `Cat` requires explicit composition semantics)
@@ -202,7 +203,7 @@ When to pick `proofs.py` vs `laws.py`:
 
 ---
 
-## Failure behavior summary (fail‑fast)
+## Failure behavior summary
 - Duplicate arrow names in builder → `ValueError`
 - Missing composition entry in `Cat.compose` → `KeyError`
 - Missing identity in `Cat.identity` → `KeyError`
