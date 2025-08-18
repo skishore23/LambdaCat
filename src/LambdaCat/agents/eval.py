@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Generic, Iterable, List, Mapping, Sequence, Tuple, TypeVar
 
 from .actions import Plan
-from .runtime import strong_monoidal_functor, call_action, compile_structured_plan
+from .runtime import call_action, compile_structured_plan
 from .runtime import Action
 from ..core.presentation import Formal1
 

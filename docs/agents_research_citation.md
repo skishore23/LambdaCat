@@ -43,7 +43,7 @@ Build a literature‑grade research agent that:
 
 - Objects (data shapes): `Query`, `URL`, `HTML`, `Text`, `Facts`, `Claims`, `Citations`, `Draft`.
 - Morphisms (actions): pure transforms between shapes, e.g., `search: Query → URL*`, `fetch: URL → HTML`, `extract: Text → Facts`.
-- Functor: plan algebra (`Formal1`) → concrete runtime `(State, Ctx?) → State` via `strong_monoidal_functor`.
+- Functor: plan algebra (`Formal1`) → concrete runtime `(State, Ctx?) → State` via `sequential_functor`.
 - Naturality idea: different extraction pipelines should commute with a canonicalization map (consistency across adapters).
 
 You can model adapter invariants with small categories and run suites (`CATEGORY_SUITE`, `FUNCTOR_SUITE`) and `check_naturality` where appropriate.

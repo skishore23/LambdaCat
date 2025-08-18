@@ -8,7 +8,7 @@
 
 * **Core:** immutable `Obj`, `Cat`, explicit `composition` and `identities`, builder helpers, law suites.
 * **Plugins:** stubs only (e.g., Tamari placeholder); no features are enabled by default.
-* **Agents:** plans as formal words → mapped to real Python callables by a strong-monoidal runtime; scoring + traces; choose best plan.
+* **Agents:** plans as formal words → mapped to real Python callables by a sequential functor; structured plans via explicit interpreter; scoring + traces.
 * **Laws:** extensible law engine → suites for categories; proofs helpers for universal properties.
 * **Viz:** automatic **Mermaid** exporters for categories, functors, naturality squares, plans, and execution Gantt.
 * **Packaging:** pip-installable core.
@@ -18,7 +18,7 @@
 ## Why LambdaCat?
 
 - Confidence by construction: executable law checks for categories, functors, and naturality you can run in tests/CI.
-- Composability that scales: a strong‑monoidal runtime interprets plans as pipelines; build with `sequence`, `parallel`, `choose`, `focus`, and `loop_while`.
+- Composability that scales: a sequential functor interprets `Formal1` pipelines; structured plans via interpreter; build with `sequence`, `parallel`, `choose`, `focus`, and `loop_while`.
 - Small, typed surface: minimal dataclasses and explicit maps; easy to read, reason about, and extend.
 - Traceable runs: per‑step timings and optional snapshots for debugging and auditing.
 - Diagram‑ready: generate Mermaid graphs for categories, functors, naturality squares, plans, and execution Gantt.
@@ -95,8 +95,13 @@ check_naturality(eta)
 from LambdaCat.core.laws import run_suite
 from LambdaCat.core.laws_category import CATEGORY_SUITE
 from LambdaCat.core.laws_functor import FUNCTOR_SUITE
+from LambdaCat.core import NATURAL_SUITE
 assert run_suite(C, CATEGORY_SUITE).ok
 assert run_suite(F, FUNCTOR_SUITE).ok
+# Given eta: Natural(F,G), verify naturality suite
+# from LambdaCat.core.natural import Natural
+# eta = Natural(source=F, target=F, components={...})
+# assert run_suite(eta, NATURAL_SUITE).ok
 ```
 
 ---
@@ -136,8 +141,8 @@ plan = Formal1(("denoise","edges","segment","merge"))
 Maps plan → pipeline; runs functions with `(x)` or `(x, ctx)` signature.
 
 ```python
-from LambdaCat.agents.runtime import strong_monoidal_functor
-F = strong_monoidal_functor(impl)
+from LambdaCat.agents.runtime import sequential_functor
+F = sequential_functor(impl)
 out = F(plan)("a..b", ctx={})
 ```
 

@@ -8,7 +8,8 @@
 
 ## ✨ Features
 
-- 🤖 Composable agents: typed plan algebra (`sequence`/`parallel`/`choose`), lenses (`focus`) and loops (`loop_while`), strong-monoidal runtime  
+- 🤖 Composable agents: typed plan algebra (`sequence`/`parallel`/`choose`), lenses (`focus`) and loops (`loop_while`), sequential interpreter for `Formal1` and structured plan runner  
+- 🧰 Developer-first DX: `Actions` registry, `AgentBuilder`, and helpers (`concat`/`first`/`argmax`)  
 - ✅ Object and morphism modeling  
 - 🔁 Functors with composition and identity preservation  
 - 🌀 Natural transformations with full naturality condition checks  
@@ -45,22 +46,6 @@ Use it for:
 
 ---
 
-## 🧮 Type‑theoretic stance
-
-- **Positioning**
-  - **λ→ (simply typed)**: core APIs are STLC‑like, pure, and law‑centric.
-  - **λ2 (polymorphism)**: parametric generics via `typing`/`TypeVar`; suites enforce identity/associativity/naturality akin to parametricity guarantees.
-  - **λω (type operators)**: approximated with Python generics; no higher‑kinded types; we avoid emulation hacks.
-  - **λP (dependent types)**: out of scope for Python; we do not simulate dependent typing in core.
-- **Implications**
-  - **Fail‑fast boundaries**: no ad‑hoc runtime type dispatch in core; keep functions small, pure, and parametric.
-  - **Proof surface**: categorical laws are checked by suites; deeper dependent proofs live in external proof assistants (linked from docs if needed).
-  - **Scope control**: avoid pseudo‑dependent encodings; if research needs them, they belong in extras/docs, never imported by core.
-- **Why this helps**
-  - **Clarity** and **maintainability**: communicates boundaries, prevents fragile designs, and keeps the core minimal and law‑centric.
-
----
-
 ## 🛠️ Setup (recommended: editable install)
 
 Create a virtual environment and install the package locally (no publishing required):
@@ -80,7 +65,7 @@ Minimal agent flow with a runner and evaluator:
 
 ```python
 from LambdaCat.core.presentation import Formal1
-from LambdaCat.agents.eval import Agent
+from LambdaCat.agents import Agent
 
 actions = {
   'denoise': lambda s, ctx=None: s.replace('~',''),
@@ -99,11 +84,40 @@ print(report.output)      # [ABC]
 print(report.score)       # e.g., 5
 ```
 
+Quickstart with the Actions registry and AgentBuilder:
+
+```python
+from LambdaCat.agents import Actions, AgentBuilder, task, sequence, parallel, choose, run_structured_plan, concat, argmax
+
+actions = (
+  Actions[str, None].empty()
+    .register('clean', lambda s, ctx=None: s.strip())
+    .register('upper', lambda s, ctx=None: s.upper())
+    .register('keywords', lambda s, ctx=None: ' '.join(sorted(set([w for w in s.split() if len(w)>3]))))
+)
+
+plan = sequence(
+  actions.task('clean'),
+  parallel(actions.task('upper'), actions.task('keywords')),
+  choose(actions.task('upper'), actions.task('keywords')),
+)
+
+agent = AgentBuilder(actions.mapping()).with_snapshot(True).build()
+report = run_structured_plan(
+  plan,
+  actions.mapping(),
+  input_value='  hello world  ',
+  aggregate_fn=concat(' | '),
+  choose_fn=argmax(lambda s: len(str(s))),
+  snapshot=True,
+)
+print(report.output)
+```
+
 Structured plans with explicit composition and invariants:
 
 ```python
-from LambdaCat.agents.actions import task, sequence, parallel, choose
-from LambdaCat.agents.eval import run_structured_plan
+from LambdaCat.agents import task, sequence, parallel, choose, run_structured_plan, concat, argmax
 
 impl = {
   'clean':   lambda s, ctx=None: s.strip(),
@@ -115,15 +129,15 @@ impl = {
 plan = sequence(
   task('clean'),
   parallel(task('summ'), task('keywords')),
-  choose(task('upper'), task('clean'))
+  choose(task('upper'), task('clean')),
 )
 
 report = run_structured_plan(
   plan,
   impl,
   input_value="  hello world  ",
-  aggregate_fn=lambda outs: tuple(outs),
-  choose_fn=lambda outs: 0,
+  aggregate_fn=concat(''),
+  choose_fn=argmax(lambda s: len(str(s))),
   snapshot=True,
 )
 print(report.output)
@@ -204,7 +218,7 @@ Minimal end-to-end example with a runner and scorer:
 
 ```python
 from LambdaCat.core.presentation import Formal1
-from LambdaCat.agents.eval import Agent
+from LambdaCat.agents import Agent
 
 actions = {
   'denoise': lambda s, ctx=None: s.replace('~',''),
@@ -223,10 +237,14 @@ print(report.output)      # [ABC]
 print(report.score)       # e.g., 5
 ```
 
-Generate a Mermaid Gantt of the execution trace:
+Generate Mermaid diagrams (plan, structured plan, and Gantt):
 
 ```python
-from LambdaCat.extras.viz_mermaid import exec_gantt_mermaid
+from LambdaCat.core.presentation import Formal1
+from LambdaCat.extras.viz_mermaid import plan_mermaid, structured_plan_mermaid, exec_gantt_mermaid
+
+print(plan_mermaid(Formal1(('clean','upper'))))
+print(structured_plan_mermaid(plan))
 print(exec_gantt_mermaid(report))
 ```
 
@@ -234,7 +252,7 @@ print(exec_gantt_mermaid(report))
 
 ```python
 from LambdaCat.core.presentation import Formal1
-from LambdaCat.agents.runtime import strong_monoidal_functor
+from LambdaCat.agents.runtime import sequential_functor
 
 actions = {
   'denoise': lambda s, ctx=None: s.replace('~',''),
@@ -244,7 +262,7 @@ actions = {
 }
 
 plan = Formal1(('denoise','edges','segment','merge'))
-F = strong_monoidal_functor(actions)
+F = sequential_functor(actions)
 print(F(plan)("~a~b_c-1"))  # -> [ABC]
 ```
 
@@ -274,19 +292,15 @@ More tutorials and notebooks coming soon.
   - `loop_while(predicate, body_plan)` applies `body_plan` while the predicate holds; pure and deterministic.
 
 - Tracing
-  - Sequential runs collect per-step timings and optional snapshots.
-  - Structured runs return a root-level report for now.
-
+  - Sequential and structured runs collect per-task timings and optional snapshots.
 
 - Decision wiring
   - `Choose` can use an explicit `choose_fn` or an agent-level evaluator to pick branches (no silent defaults).
 
-
 - Sample usage (sketch)
   
   ```python
-  from LambdaCat.agents.actions import task, sequence, parallel, choose  # optional module
-  from LambdaCat.agents.eval import run_structured_plan         # optional module
+  from LambdaCat.agents import task, sequence, parallel, choose, run_structured_plan, concat
 
   impl = {
     'clean':   lambda s, ctx=None: s.strip(),
@@ -305,7 +319,7 @@ More tutorials and notebooks coming soon.
     plan,
     impl,
     input_value="  hello world  ",
-    aggregate_fn=lambda outs: tuple(outs),
+    aggregate_fn=concat(''),
     choose_fn=lambda outs: 0,  # pick first branch
     snapshot=True,
   )

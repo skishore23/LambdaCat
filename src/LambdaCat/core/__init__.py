@@ -6,6 +6,7 @@ from .functor import Functor, apply_functor
 from .convert import to_dict, from_dict
 from .laws import Law, LawSuite, run_suite
 from .laws_category import CATEGORY_SUITE
+from .laws_natural import NATURAL_SUITE
 
 __all__ = [
 	"Obj",
@@ -27,5 +28,6 @@ __all__ = [
 	"LawSuite",
 	"run_suite",
 	"CATEGORY_SUITE",
+	"NATURAL_SUITE",
 ]
 

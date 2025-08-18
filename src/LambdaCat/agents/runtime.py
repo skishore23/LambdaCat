@@ -27,7 +27,7 @@ def _call_action_generic(fn: Callable[..., TState], x: TState, ctx: Ctx | None) 
     raise TypeError("Action must accept 1 (x) or 2 (x, ctx) parameters")
 
 
-def strong_monoidal_functor(
+def sequential_functor(
     implementation: Mapping[str, Action[State, Ctx]],
     mode: str = "sequential",
 ):

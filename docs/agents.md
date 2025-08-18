@@ -7,7 +7,7 @@ Minimal, composable pipelines built from named actions.
 ```python
 from LambdaCat.agents import (
   task, sequence, parallel, choose, lens, focus, loop_while,
-  strong_monoidal_functor, compile_structured_plan,
+  sequential_functor, compile_structured_plan,
   Agent, AgentBuilder, run_plan, run_structured_plan, choose_best, quick_functor_laws,
   Actions, concat, first, argmax,
 )
@@ -35,7 +35,7 @@ Notes:
 - `Action[State, Ctx]`: callables `(State) -> State` or `(State, Ctx) -> State`.
 - `Plan[State, Ctx]`: typed plan tree composed from `Task`, `Sequence`, `Parallel`, `Choose`, `Focus`, `LoopWhile`.
 - Runners:
-  - `strong_monoidal_functor(impl)` compiles `Formal1` to `(State, Ctx?) -> State`.
+  - `sequential_functor(impl)` compiles `Formal1` to `(State, Ctx?) -> State` 
   - `compile_structured_plan(impl, plan, ..., choose_fn?, aggregate_fn?)` returns `(State, Ctx?) -> State`.
 
 Task calls an Action. Actions are functions; Tasks are nodes in a plan.

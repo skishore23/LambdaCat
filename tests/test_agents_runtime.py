@@ -1,5 +1,5 @@
 from LambdaCat.core.presentation import Formal1
-from LambdaCat.agents.runtime import strong_monoidal_functor
+from LambdaCat.agents.runtime import sequential_functor
 
 
 def test_agent_pipeline_runs():
@@ -10,6 +10,6 @@ def test_agent_pipeline_runs():
 		'merge': lambda s: f"[{s}]",
 	}
 	plan = Formal1(('denoise','edges','segment','merge'))
-	F = strong_monoidal_functor(skills)
+	F = sequential_functor(skills)
 	assert F(plan)("~a~b_c-1") == "[ABC]"
 
