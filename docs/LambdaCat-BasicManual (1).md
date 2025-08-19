@@ -163,39 +163,96 @@ check_naturality(F, G, eta)
 
 ### 3.1 Why Laws?
 In mathematics, categories and functors are defined by axioms.  
-LambdaCat encodes these axioms as **laws** you can automatically test.  
+LambdaCat encodes these axioms as **law suites** — collections of checks.  
 
-This ensures that your structures are **not just data**, but valid categorical objects.
+This way, you can tell if your category is valid, or if you made a mistake.
 
 ---
 
-### 3.2 Category Laws
-- Associativity
-- Identity
+### 3.2 Category Laws — Example
 
 ```python
+from lambdacat.core.category import Cat
 from lambdacat.lawsuite import CATEGORY_SUITE
+
+objects = ["A","B"]
+morphisms = {
+    ("A","A"): ["id_A"],
+    ("B","B"): ["id_B"],
+    ("A","B"): ["f"]
+}
+composition = {}
+identities = {"A":"id_A","B":"id_B"}
+
+C = Cat(objects, morphisms, composition, identities)
 CATEGORY_SUITE.run_suite(C)
+```
+
+**Output:**
+```
+[✓] Identity laws hold
+[✓] Associativity holds
 ```
 
 ---
 
-### 3.3 Functor Laws
-- Preservation of identity  
-- Preservation of composition  
+### 3.3 Broken Category Example
+
+```python
+objects = ["A"]
+morphisms = {("A","A"): []}  # no identity
+composition = {}
+identities = {}
+
+C_bad = Cat(objects, morphisms, composition, identities)
+CATEGORY_SUITE.run_suite(C_bad)
+```
+
+**Output:**
+```
+[✗] Identity law failed: object 'A' has no identity
+```
 
 ---
 
-### 3.4 Monad Laws
-- Left identity  
-- Right identity  
-- Associativity  
+### 3.4 Functor Laws
 
 ```python
-from lambdacat.monads.instances import Maybe
+from lambdacat.categories.standard import discrete_category
+from lambdacat.core.functor import FunctorBuilder
+from lambdacat.lawsuite import FUNCTOR_SUITE
+
+C = discrete_category(["X","Y"])
+F = FunctorBuilder(C,C)
+F.add_object_mapping("X","X")
+F.add_object_mapping("Y","Y")
+functor = F.build()
+
+FUNCTOR_SUITE.run_suite(F)
+```
+
+**Output:**
+```
+[✓] Preserves identities
+[✓] Preserves composition
+```
+
+---
+
+### 3.5 Monad Laws
+
+```python
+from lambdacat.data import Option
 from lambdacat.monads.laws import monad_laws
 
-monad_laws(Maybe, gen=lambda: Maybe.pure(1))
+monad_laws(Option)
+```
+
+**Output:**
+```
+[✓] Left identity
+[✓] Right identity
+[✓] Associativity
 ```
 
 ---
@@ -203,46 +260,35 @@ monad_laws(Maybe, gen=lambda: Maybe.pure(1))
 ## 4. From Functors to Monads
 
 ### 4.1 Functors
-- Minimal notion: ability to **map** a function over a context.  
+A functor can **map** over data:
+
 ```python
 from lambdacat.data import Option
 print(Option.some(3).map(lambda x: x+1))  # Some(4)
 ```
 
-Laws:
-- F(id) = id
-- F(g∘f) = F(g)∘F(f)
-
 ---
 
 ### 4.2 Applicatives
-- Extend functors with the ability to apply **wrapped functions**.  
+Applicatives extend functors with applying wrapped functions:
+
 ```python
 add = Option.pure(lambda x,y: x+y)
 print(add.ap(Option.some(2)).ap(Option.some(3)))  # Some(5)
 ```
 
-Laws:
-- Identity
-- Homomorphism
-- Interchange
-- Composition
-
 ---
 
 ### 4.3 Monads
-- Extend applicatives with **bind**: sequencing computations where the next step depends on the previous result.  
+Monads add **bind**, sequencing computations:
+
 ```python
 from lambdacat.data import Result
 
 safe_div = lambda x,y: Result.err("div by zero") if y==0 else Result.ok(x/y)
 print(Result.ok((10,2)).bind(lambda xy: safe_div(*xy)))  # Ok(5.0)
+print(Result.ok((10,0)).bind(lambda xy: safe_div(*xy)))  # Err("div by zero")
 ```
-
-Laws:
-- Left identity
-- Right identity
-- Associativity
 
 ---
 
@@ -253,8 +299,6 @@ Every monad is also an applicative, and every applicative is also a functor.
 Functor ⊂ Applicative ⊂ Monad
 ```
 
-LambdaCat provides **law suites** for each layer, so you can verify correctness at all levels.
-
 ---
 
 ## 5. Functional Programming in LambdaCat
@@ -263,10 +307,8 @@ LambdaCat provides **law suites** for each layer, so you can verify correctness 
 ```python
 from lambdacat.data import Option, Result
 
-x = Option.some(42)
-y = Option.none()
-print(x.map(lambda n: n + 1))   # Some(43)
-print(y.map(lambda n: n + 1))   # None
+print(Option.some(42).map(lambda n: n+1))   # Some(43)
+print(Result.ok(10).bind(lambda n: Result.ok(n*2)))  # Ok(20)
 ```
 
 ---
@@ -302,14 +344,7 @@ print(city_lens.set(user,"Paris"))
 
 ---
 
-### 6.2 Prisms
-Prisms let you work with sum types (`Option`, `Result`) safely.
-
----
-
 ## 7. Agents and Plans
-
-LambdaCat includes a DSL for **agents** built from composable plans.
 
 ```python
 from lambdacat.agents.plan import Sequence, Plan
