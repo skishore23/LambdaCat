@@ -56,3 +56,6 @@ extend-select = ["I", "F", "E", "W", "B", "UP"]
 python_version = "3.11"
 strict = true
 warn_unused_ignores = true
+mypy_path = "src"
+packages = ["LambdaCat"]
+explicit_package_bases = true

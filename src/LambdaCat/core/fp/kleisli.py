@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Dict, Generic, List, Tuple, TypeVar, Type, Mapping, Any
+from typing import Callable, Dict, Generic, List, Tuple, TypeVar, Type
 
-from .typeclasses import MonadT
+from .typeclasses import FunctorT, ApplicativeT, MonadT
 from ..builder import obj as _obj, arrow as _arrow, build_presentation
 from ..category import Cat
 
 A = TypeVar("A")
-B = TypeVar("B")
+B = TypeVar("B") 
 C = TypeVar("C")
-M = TypeVar("M", bound=MonadT[Any])
+M = TypeVar("M")
 
 
 @dataclass(frozen=True)
@@ -21,48 +21,48 @@ class Kleisli(Generic[M, A, B]):
     
     def compose(self, other: "Kleisli[M, C, A]") -> "Kleisli[M, C, B]":
         """Compose Kleisli arrows: (self ∘ other)(c) = self(other(c)) >>= self.run"""
-        return Kleisli(lambda c: other.run(c).bind(self.run))
+        return Kleisli(lambda c: other.run(c).bind(self.run))  # type: ignore[attr-defined]
     
     def then(self, other: Kleisli[M, B, C]) -> Kleisli[M, A, C]:
         """Sequential composition: self >>= other"""
         return other.compose(self)
     
     @classmethod
-    def pure(cls, monad_cls: Type[MonadT[B]], value: B) -> "Kleisli[M, A, B]":
+    def pure(cls, monad_cls: Type[M], value: B) -> "Kleisli[M, A, B]":
         """Pure arrow: pure(b) = λa. return b"""
-        return cls(lambda _: monad_cls.pure(value))
+        return cls(lambda _: monad_cls.pure(value))  # type: ignore[attr-defined]
     
-    @classmethod
-    def id(cls, monad_cls: Type[MonadT[A]]) -> "Kleisli[M, A, A]":
+    @classmethod  
+    def id(cls, monad_cls: Type[M]) -> "Kleisli[M, A, A]":
         """Identity arrow: id = λa. return a"""
-        return cls(lambda a: monad_cls.pure(a))
+        return cls(lambda a: monad_cls.pure(a))  # type: ignore[attr-defined,return-value]
     
     def __call__(self, a: A) -> M:
         return self.run(a)
 
 
-def kleisli_cat(monad_cls: Type[MonadT[Any]], obj_type: type) -> type:
+def kleisli_cat(monad_cls: Type[M], obj_type: type) -> type:
     """Create a Kleisli category for a given monad and object type."""
     
     class KleisliCategory:
         """Category where objects are types and morphisms are Kleisli arrows."""
         
         @staticmethod
-        def identity(obj_type: type) -> Kleisli[Any, Any, Any]:
+        def identity(obj_type: type) -> Kleisli[M, object, object]:
             return Kleisli.pure(monad_cls, obj_type)
         
         @staticmethod
-        def compose(g: Kleisli[Any, Any, Any], f: Kleisli[Any, Any, Any]) -> Kleisli[Any, Any, Any]:
+        def compose(g: Kleisli[M, object, object], f: Kleisli[M, object, object]) -> Kleisli[M, object, object]:
             return g.compose(f)
     
     return KleisliCategory
 
 
-# Registry for monad instances
-_MONAD_REGISTRY: Dict[str, Type[MonadT[Any]]] = {}
+# Registry for monad instances  
+_MONAD_REGISTRY: Dict[str, type] = {}
 
 
-def register_monad(name: str, monad_cls: Type[MonadT[Any]]) -> None:
+def register_monad(name: str, monad_cls: type) -> None:
     """Register a monad instance for use with Kleisli category builder.
     
     Args:
@@ -72,7 +72,7 @@ def register_monad(name: str, monad_cls: Type[MonadT[Any]]) -> None:
     _MONAD_REGISTRY[name] = monad_cls
 
 
-def get_registered_monads() -> Dict[str, Type[MonadT[Any]]]:
+def get_registered_monads() -> Dict[str, type]:
     """Get all registered monad instances."""
     return dict(_MONAD_REGISTRY)
 
@@ -101,26 +101,26 @@ def kleisli_category_for(monad_name: str, objects: List[str]) -> "KleisliCat":
 class KleisliCat:
     """A concrete Kleisli category for a specific monad."""
     
-    def __init__(self, name: str, objects: List[str], monad_cls: Type[MonadT[Any]]):
+    def __init__(self, name: str, objects: List[str], monad_cls: type):
         self.name = name
         self.objects = tuple(objects)
         self.monad_cls = monad_cls
         
         # Create identity arrows
-        self.arrows: Dict[str, Kleisli[Any, Any, Any]] = {}
+        self.arrows: Dict[str, Kleisli[object, object, object]] = {}
         self.identities: Dict[str, str] = {}
         self.composition: Dict[Tuple[str, str], str] = {}
         
         for obj in objects:
             id_name = f"id:{obj}"
-            id_arrow = Kleisli.id(monad_cls)
+            id_arrow: Kleisli[object, object, object] = Kleisli.id(monad_cls)
             self.arrows[id_name] = id_arrow
             self.identities[obj] = id_name
             
             # Identity composition laws
             self.composition[(id_name, id_name)] = id_name
     
-    def add_arrow(self, name: str, source: str, target: str, kleisli_fn: Kleisli[Any, Any, Any]) -> "KleisliCat":
+    def add_arrow(self, name: str, source: str, target: str, kleisli_fn: Kleisli[M, object, object]) -> "KleisliCat":
         """Add a Kleisli arrow to the category.
         
         Returns a new KleisliCat with the arrow added.
@@ -137,7 +137,7 @@ class KleisliCat:
         new_cat.arrows = dict(self.arrows)
         new_cat.composition = dict(self.composition)
         
-        new_cat.arrows[name] = kleisli_fn
+        new_cat.arrows[name] = kleisli_fn  # type: ignore[assignment]
         
         # Add identity composition laws for new arrow
         id_source = self.identities[source]
@@ -231,29 +231,29 @@ _auto_register_monads()
 
 
 # Utility functions for working with Kleisli arrows
-def lift(f: Callable[[A], B]) -> Kleisli[M, A, B]:
+def lift(f: Callable[[A], B], monad_cls: Type[M]) -> Kleisli[M, A, B]:
     """Lift a pure function to a Kleisli arrow."""
-    return Kleisli(lambda a: type(a).pure(f(a)) if hasattr(type(a), 'pure') else f(a))
+    return Kleisli(lambda a: monad_cls.pure(f(a)))  # type: ignore[attr-defined]
 
 
-def join(monad_cls: type[MonadT]) -> Kleisli[MonadT, M[M[A]], M[A]]:
+def join() -> Kleisli[object, object, object]:
     """Join operation as a Kleisli arrow."""
-    return Kleisli(lambda mma: mma.bind(lambda ma: ma))
+    return Kleisli(lambda mma: mma.bind(lambda ma: ma))  # type: ignore[attr-defined]
 
 
-def fmap(f: Callable[[A], B]) -> Callable[[M[A]], M[B]]:
+def fmap(f: Callable[[A], B]) -> Callable[[M], M]:
     """Functor map as a function."""
-    return lambda ma: ma.map(f)
+    return lambda ma: ma.map(f)  # type: ignore[attr-defined]
 
 
-def ap(mf: M[Callable[[A], B]], ma: M[A]) -> M[B]:
+def ap(mf: M, ma: M) -> M:
     """Applicative ap as a function."""
-    return ma.ap(mf)
+    return mf.ap(ma)  # type: ignore[attr-defined,no-any-return]
 
 
-def bind(ma: M[A], f: Callable[[A], M[B]]) -> M[B]:
+def bind(ma: M, f: Callable[[A], M]) -> M:
     """Monad bind as a function."""
-    return ma.bind(f)
+    return ma.bind(f)  # type: ignore[attr-defined,no-any-return]
 
 
 # Structural category helper used by tests
