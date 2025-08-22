@@ -4,24 +4,10 @@ from dataclasses import dataclass
 from typing import Any, Callable, List, Mapping
 
 from LambdaCat.core.presentation import Formal1
-from LambdaCat.agents import (
-    Agent,
-    AgentBuilder,
-    Actions,
-    task,
-    sequence,
-    parallel,
-    choose,
-    lens,
-    focus,
-    run_structured_plan,
-    quick_functor_laws,
-    concat,
-    first,
-    argmax,
-)
-from LambdaCat.agents.actions import loop_while
-from LambdaCat.extras.viz_mermaid import plan_mermaid, structured_plan_mermaid, exec_gantt_mermaid
+from LambdaCat.agents.actions import Task, sequence, parallel, choose, focus, loop_while
+from LambdaCat.agents.runtime import compile_plan, compile_to_kleisli
+from LambdaCat.core.fp.instances.option import Option
+from LambdaCat.core.optics import Lens
 from pathlib import Path
 
 
@@ -81,33 +67,35 @@ Implementation: Mapping[str, Callable[..., str]] = {
     "to_upper": to_upper,
 }
 
-# Also expose a registry-based interface
-Registry = (
-    Actions[str, Any].empty()
-    .register("identity", identity)
-    .register("strip_ws", strip_ws)
-    .register("to_lower", to_lower)
-    .register("remove_noise", remove_noise)
-    .register("normalize_ws", normalize_ws)
-    .register("summarize_head", summarize_head)
-    .register("extract_keywords", extract_keywords)
-    .register("to_upper", to_upper)
-)
-
 
 # -----------------------------
-# Demo 1: Linear plan + chooser
+# Demo 1: Linear plan comparison
 # -----------------------------
 
 def demo_linear_plan(input_text: str) -> None:
-    plan_a = Formal1(("strip_ws", "remove_noise", "normalize_ws"))
-    plan_b = Formal1(("strip_ws", "to_lower", "normalize_ws"))
+    # Create two different plans
+    plan_a = sequence(Task("strip_ws"), Task("remove_noise"), Task("normalize_ws"))
+    plan_b = sequence(Task("strip_ws"), Task("to_lower"), Task("normalize_ws"))
 
-    agent = Agent(implementation=Implementation, evaluator=lambda out: -len(out))
-    best_plan, report = agent.choose_best([plan_a, plan_b], input_text)
+    # Execute both plans and compare results
+    executable_a = compile_plan(Implementation, plan_a)
+    executable_b = compile_plan(Implementation, plan_b)
+    
+    result_a = executable_a(input_text)
+    result_b = executable_b(input_text)
+    
+    # Choose the shorter result (simple heuristic)
+    if len(result_a) <= len(result_b):
+        chosen_plan = "Plan A"
+        chosen_result = result_a
+    else:
+        chosen_plan = "Plan B"
+        chosen_result = result_b
 
-    print("[Linear] chosen:", best_plan.factors)
-    print("[Linear] output:", report.output)
+    print(f"[Linear] chosen: {chosen_plan}")
+    print(f"[Linear] output: {chosen_result}")
+    print(f"[Linear] Plan A result: {result_a}")
+    print(f"[Linear] Plan B result: {result_b}")
 
 
 # ---------------------------------------------
@@ -115,37 +103,32 @@ def demo_linear_plan(input_text: str) -> None:
 # ---------------------------------------------
 
 def demo_structured_plan(input_text: str) -> None:
-    # Using free builders
+    # Create a complex plan with parallel and choice operations
     plan = sequence(
-        task("strip_ws"),
-        task("remove_noise"),
-        parallel(task("summarize_head"), task("extract_keywords")),
-        choose(task("to_upper"), task("identity")),
+        Task("strip_ws"),
+        Task("remove_noise"),
+        parallel(Task("summarize_head"), Task("extract_keywords")),
+        choose(Task("to_upper"), Task("identity")),
     )
 
-    # Using registry-bound builders (same plan)
-    _ = Registry.sequence(
-        Registry.task(strip_ws),
-        Registry.task(remove_noise),
-        Registry.parallel(Registry.task(summarize_head), Registry.task(extract_keywords)),
-        Registry.choose(Registry.task(to_upper), Registry.task("identity")),
-    )
+    # Execute the plan with aggregation for parallel results
+    def aggregate_parallel(results):
+        return " | ".join(str(r) for r in results)
+    
+    def choose_first(results):
+        return 0 if results else 0  # Return index, not the result itself
 
-    report = run_structured_plan(
-        plan,
-        Implementation,
-        input_value=input_text,
-        aggregate_fn=concat(" | "),
-        choose_fn=first(),
-        snapshot=True,
-    )
-    print("[Structured] output:", report.output)
-
-    # Visuals to console (Mermaid)
-    linear = Formal1(("strip_ws", "remove_noise", "normalize_ws"))
-    print(plan_mermaid(linear))
-    print(structured_plan_mermaid(plan))
-    print(exec_gantt_mermaid(report))
+    executable = compile_plan(Implementation, plan, 
+                            aggregate_fn=aggregate_parallel,
+                            choose_fn=choose_first)
+    result = executable(input_text)
+    
+    print(f"[Structured] output: {result}")
+    
+    # Also demonstrate Kleisli compilation
+    kleisli_plan = compile_to_kleisli(Implementation, plan, Option)
+    kleisli_result = kleisli_plan(input_text)
+    print(f"[Structured] Kleisli result: {kleisli_result}")
 
 
 # ---------------------------------
@@ -158,113 +141,108 @@ class Article:
     body: str
 
 
-def _article_body_get(a: Article) -> str:
-    return a.body
-
-
-def _article_body_set(a: Article, new_body: str) -> Article:
-    return Article(title=a.title, body=new_body)
-
-
 def demo_focus_plan(article: Article) -> None:
-    body_lens = lens(_article_body_get, _article_body_set)
-    plan = focus(
-        body_lens,
-        sequence(task("strip_ws"), task("to_lower"), task("normalize_ws")),
+    # Create a lens for the article body
+    body_lens = Lens(
+        get=lambda a: a.body,
+        set=lambda new_body, a: Article(title=a.title, body=new_body)
     )
-    report = run_structured_plan(
-        plan,
-        Implementation,
-        input_value=article,
-        aggregate_fn=None,
-        choose_fn=None,
-        snapshot=True,
+    
+    # Create a plan that focuses on the body
+    body_processing_plan = sequence(
+        Task("strip_ws"), 
+        Task("to_lower"), 
+        Task("normalize_ws")
     )
-    print("[Focus] title:", report.output.title)
-    print("[Focus] body:", report.output.body)
+    
+    plan = focus(body_lens, body_processing_plan)
+    
+    # Execute the focused plan
+    executable = compile_plan(Implementation, plan)
+    result = executable(article)
+    
+    print(f"[Focus] Original title: {article.title}")
+    print(f"[Focus] Original body: '{article.body}'")
+    if hasattr(result, 'title') and hasattr(result, 'body'):
+        print(f"[Focus] Processed title: {result.title}")
+        print(f"[Focus] Processed body: '{result.body}'")
+    else:
+        print(f"[Focus] Focus result: {result}")
+        print("[Focus] Note: Focus operation may need adjustment for this lens implementation")
 
 
 # ---------------------------------
-# Demo 4: Loop + choose (argmax)
+# Demo 4: Loop + choose
 # ---------------------------------
-
 
 def demo_loop_and_choose(input_text: str) -> None:
     # Loop: repeatedly strip noisy '!!' until none remain, then choose best variant by length
-    def noisy(s: str) -> bool:
+    def has_noise(s: str) -> bool:
         return "!!" in s
 
     plan = sequence(
-        loop_while(noisy, task("remove_noise")),
-        choose(task("to_upper"), task("identity")),
+        loop_while(has_noise, Task("remove_noise")),
+        choose(Task("to_upper"), Task("identity")),
     )
 
-    report = run_structured_plan(
-        plan,
-        Implementation,
-        input_value=input_text,
-        aggregate_fn=None,
-        choose_fn=argmax(lambda s: len(str(s))),
-        snapshot=True,
-    )
-    print("[Loop+Choose] output:", report.output)
+    # Choose the longer result (argmax by length)
+    def choose_longest(results):
+        if not results:
+            return 0
+        return max(range(len(results)), key=lambda i: len(str(results[i])))
+
+    executable = compile_plan(Implementation, plan, choose_fn=choose_longest)
+    result = executable(input_text)
+    
+    print(f"[Loop+Choose] input: {input_text}")
+    print(f"[Loop+Choose] output: {result}")
 
 
 # ---------------------------------
-# Utilities: write diagrams
+# Demo 5: Simple sequential execution
 # ---------------------------------
 
-
-def write_diagrams() -> None:
-    out_dir = Path("docs/diagrams")
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    # Linear plan
-    linear = Formal1(("strip_ws", "remove_noise", "normalize_ws"))
-    out_dir.joinpath("Linear__plan.md").write_text("# Plan\n\n" + plan_mermaid(linear), encoding="utf-8")
-
-    # Structured plan + trace
+def demo_simple_execution() -> None:
+    """Demonstrate simple sequential plan execution."""
     plan = sequence(
-        task("strip_ws"),
-        parallel(task("summarize_head"), task("extract_keywords")),
-        choose(task("to_upper"), task("identity")),
+        Task("strip_ws"),
+        Task("to_lower"),
+        Task("normalize_ws")
     )
-    report = run_structured_plan(
-        plan,
-        Implementation,
-        input_value="  Hello, Lambda-Cat!!  Agents!  ",
-        aggregate_fn=concat(" | "),
-        choose_fn=first(),
-        snapshot=True,
-    )
-    out_dir.joinpath("Structured__plan.md").write_text("# Structured Plan\n\n" + structured_plan_mermaid(plan), encoding="utf-8")
-    out_dir.joinpath("Structured__trace.md").write_text("# Execution Trace (Gantt)\n\n" + exec_gantt_mermaid(report), encoding="utf-8")
-
-
-def _verify_functor_laws() -> None:
-    quick_functor_laws(
-        Implementation,
-        id_name="identity",
-        samples=["a", "  Hello, world!!  ", "Lambda Cat"],
-        ctx=None,
-    )
+    
+    executable = compile_plan(Implementation, plan)
+    sample = "  HELLO, World!!  "
+    result = executable(sample)
+    
+    print(f"[Simple] input: '{sample}'")
+    print(f"[Simple] output: '{result}'")
 
 
 def main() -> None:
+    """Run all agent demos."""
+    print("🤖 LambdaCat Agent Framework Demo")
+    print("=" * 40)
+    
     sample = "  Hello, Lambda-Cat!!  AI agents, composable and typed.  "
-    _verify_functor_laws()
+    
+    print("\n1. Simple Sequential Execution:")
+    demo_simple_execution()
+    
+    print("\n2. Linear Plan Comparison:")
     demo_linear_plan(sample)
+    
+    print("\n3. Structured Plan (Parallel + Choose):")
     demo_structured_plan(sample)
-
+    
+    print("\n4. Focus with Lenses:")
     art = Article(title="Note", body="   A Small SAMPLE body, with   noise!!   ")
     demo_focus_plan(art)
-
-    # AgentBuilder + convenience
-    builder = AgentBuilder(Registry.mapping()).with_snapshot(True).with_evaluator(lambda s: -len(s))
-    built = builder.build()
-    # run_seq convenience
-    report = built.run_seq("strip_ws", "normalize_ws", input_value=sample)
-    print("[AgentBuilder] output:", report.output)
+    
+    print("\n5. Loop + Choose:")
+    noisy_sample = "  Hello!! Lambda-Cat!! with noise!!  "
+    demo_loop_and_choose(noisy_sample)
+    
+    print("\n🎉 All agent demos completed successfully!")
 
 
 if __name__ == "__main__":

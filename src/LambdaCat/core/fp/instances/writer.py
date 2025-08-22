@@ -1,47 +1,74 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Generic, Tuple, TypeVar
+from typing import Callable, Generic, TypeVar
 
-from ..typeclasses import Monoid
+from ..typeclasses import FunctorT, ApplicativeT, MonadT, Monoid
 
-
-W = TypeVar("W")
 A = TypeVar("A")
 B = TypeVar("B")
+W = TypeVar("W")
 
 
 @dataclass(frozen=True)
 class Writer(Generic[W, A]):
-	"""Writer monad: accumulate logs W alongside value A.
+    """Writer monad for accumulating logs."""
+    
+    value: A
+    log: W
+    _monoid: Monoid[W]
+    
+    @classmethod
+    def pure(cls, value: A, monoid: Monoid[W] | None = None) -> Writer[W, A]:
+        """Construct a Writer with empty log.
 
-	Requires a Monoid[W] instance to combine logs. We thread a `monoid` value
-	inside the instance to preserve purity and avoid globals.
-	"""
+        Accepts an optional monoid to avoid relying on class state; if omitted,
+        requires a previously set class-level monoid via set_monoid.
+        """
+        m = monoid if monoid is not None else getattr(cls, '_default_monoid', None)
+        if m is None:
+            raise TypeError("Writer.pure requires monoid instance for log type")
+        return cls(value, m.empty(), m)
+    
+    def map(self, f: Callable[[A], B]) -> Writer[W, B]:
+        return Writer(f(self.value), self.log, self._monoid)
+    
+    def ap(self: "Writer[W, Callable[[A], B]]", wa: Writer[W, A]) -> Writer[W, B]:
+        """Apply function from this Writer to the value in wa (function.ap(value))."""
+        m = self._monoid
+        return Writer(self.value(wa.value), m.combine(self.log, wa.log), m)
+    
+    def bind(self, f: Callable[[A], Writer[W, B]]) -> Writer[W, B]:
+        m = self._monoid
+        result = f(self.value)
+        return Writer(result.value, m.combine(self.log, result.log), m)
+    
+    def tell(self, message: W) -> Writer[W, A]:
+        m = self._monoid
+        return Writer(self.value, m.combine(self.log, message), m)
+    
+    def listen(self) -> Writer[W, tuple[A, W]]:
+        return Writer((self.value, self.log), self.log, self._monoid)
+    
+    def pass_(self, f: Callable[[W], W]) -> Writer[W, A]:
+        return Writer(self.value, f(self.log), self._monoid)
+    
+    @classmethod
+    def set_monoid(cls, monoid: Monoid[W]) -> None:
+        cls._default_monoid = monoid
 
-	value: A
-	log: W
-	monoid: Monoid[W]
+    # Optional default monoid for pure() when not provided explicitly
+    _default_monoid: Monoid[W] | None = None
+    
+    def __repr__(self) -> str:
+        return f"Writer({self.value}, {self.log})"
 
-	@classmethod
-	def pure(cls, x: A, monoid: Monoid[W]) -> "Writer[W, A]":
-		return Writer(x, monoid.empty(), monoid)
 
-	def map(self, f: Callable[[A], B]) -> "Writer[W, B]":
-		return Writer(f(self.value), self.log, self.monoid)
-
-	def ap(self, ff: "Writer[W, Callable[[A], B]]") -> "Writer[W, B]":
-		combined = self.monoid.combine(ff.log, self.log)
-		return Writer(ff.value(self.value), combined, self.monoid)
-
-	def bind(self, f: Callable[[A], "Writer[W, B]"]) -> "Writer[W, B]":
-		next_w = f(self.value)
-		combined = self.monoid.combine(self.log, next_w.log)
-		if next_w.monoid is not self.monoid:
-			raise TypeError("Writer.bind requires the same Monoid instance for combination")
-		return Writer(next_w.value, combined, self.monoid)
-
-	def tell(self, w: W) -> "Writer[W, A]":
-		return Writer(self.value, self.monoid.combine(self.log, w), self.monoid)
+# Convenience constructor to preserve demo ergonomics
+def writer(value: A, log: W, monoid: Monoid[W] | None = None) -> Writer[W, A]:
+    m = monoid if monoid is not None else getattr(Writer, '_default_monoid', None)
+    if m is None:
+        raise TypeError("writer() requires a monoid instance or a default set via Writer.set_monoid")
+    return Writer(value, log, m)
 
 

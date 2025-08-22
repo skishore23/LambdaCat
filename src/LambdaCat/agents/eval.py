@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Generic, Iterable, List, Mapping, Sequence, Tuple, TypeVar
 
 from .actions import Plan
-from .runtime import call_action, compile_structured_plan
+from .runtime import call_action, compile_plan
 from .runtime import Action
 from ..core.presentation import Formal1
 
@@ -96,7 +96,7 @@ def run_structured_plan(
         return wrapped
 
     traced_impl: Mapping[str, Action[State, Ctx]] = {k: _wrap(k, v) for k, v in implementation.items()}
-    runner = compile_structured_plan(traced_impl, plan, choose_fn=choose_fn, aggregate_fn=aggregate_fn)
+    runner = compile_plan(traced_impl, plan, choose_fn=choose_fn, aggregate_fn=aggregate_fn)
     output = runner(input_value, ctx)
     return RunReport(output=output, score=None, trace=tuple(traces))
 

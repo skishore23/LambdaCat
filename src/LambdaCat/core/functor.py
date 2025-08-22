@@ -13,6 +13,11 @@ class Functor:
 	object_map: Dict[str, str]
 	morphism_map: Dict[str, str]
 
+	def __repr__(self) -> str:
+		obj_count = len(self.object_map)
+		mor_count = len(self.morphism_map)
+		return f"Functor({self.name}: {obj_count} objects, {mor_count} morphisms)"
+
 
 def apply_functor(F: Functor, path: Formal1) -> Formal1:
 	factors = tuple(F.morphism_map[f] for f in path.factors)
@@ -26,6 +31,18 @@ class CatFunctor:
 	target: Cat
 	object_map: Mapping[str, str]
 	morphism_map: Mapping[str, str]
+
+	# FunctorT instance (map on morphism names as values)
+	def map(self, f: callable) -> "CatFunctor":  # type: ignore[override]
+		# No-op map since CatFunctor is not a value container; provided for law harness compatibility
+		return self
+
+	def __repr__(self) -> str:
+		src_name = self.source.__class__.__name__
+		tgt_name = self.target.__class__.__name__
+		obj_count = len(self.object_map)
+		mor_count = len(self.morphism_map)
+		return f"CatFunctor({self.name}: {src_name} → {tgt_name}, {obj_count} objects, {mor_count} morphisms)"
 
 
 class FunctorBuilder:

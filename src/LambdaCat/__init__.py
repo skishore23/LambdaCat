@@ -2,7 +2,11 @@ from importlib.metadata import version, PackageNotFoundError
 
 __all__ = [
 	"core",
-	"agents",
+	"agents", 
+	"render",
+	"functors",
+	"monads",
+	"diagrams",
 	"extras",
 	"plugins",
 ]

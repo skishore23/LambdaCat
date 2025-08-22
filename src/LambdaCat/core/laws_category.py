@@ -63,6 +63,36 @@ class _AssociativityLaw(Law[Cat]):
 		return LawResult(self.name, passed=(len(violations) == 0), violations=violations)
 
 
-CATEGORY_SUITE = LawSuite[Cat]("category-core", laws=[_IdentitiesLaw(), _AssociativityLaw()])
+@dataclass(frozen=True)
+class _WellTypedComposition(Law[Cat]):
+	name: str = "well-typed-composition"
+	tags: Sequence[str] = ("category", "core")
+
+	def run(self, C: Cat, config: Dict[str, object]) -> LawResult[Cat]:
+		violations: List[Violation[Cat]] = []
+		# If cod(f)==dom(g), then (g,f) must appear in composition table and with correct typing
+		# Build lookup for arrows by name
+		by_name = {a.name: a for a in C.arrows}
+		for f_name, f in by_name.items():
+			for g_name, g in by_name.items():
+				if f.target != g.source:
+					continue
+				key = (g_name, f_name)
+				if key not in C.composition:
+					violations.append(Violation(self.name, "missing composite for typed pair", {"g": g_name, "f": f_name}))
+					continue
+				h_name = C.composition[key]
+				if h_name not in by_name:
+					violations.append(Violation(self.name, "composite not an arrow name", {"h": h_name}))
+					continue
+				h = by_name[h_name]
+				if not (h.source == f.source and h.target == g.target):
+					violations.append(
+						Violation(self.name, "typed endpoints of composite mismatch", {"g": g_name, "f": f_name, "h": h_name})
+					)
+		return LawResult(self.name, passed=(len(violations) == 0), violations=violations)
+
+
+CATEGORY_SUITE = LawSuite[Cat]("category-core", laws=[_IdentitiesLaw(), _AssociativityLaw(), _WellTypedComposition()])
 
 

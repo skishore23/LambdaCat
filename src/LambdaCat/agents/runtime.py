@@ -45,6 +45,79 @@ def sequential_functor(
 
     return F
 
+
+def compile_to_kleisli(
+    implementation: Mapping[str, Action[State, Ctx]],
+    plan: Plan[State, Ctx],
+    monad_cls: type[MonadT],
+    mode: str = "monadic"
+) -> Kleisli[MonadT, State, State]:
+    """Compile a plan to a Kleisli arrow for the given monad.
+    
+    Note: Complex plans with parallel and choose operations may not work correctly
+    in Kleisli context. For complex plans, use compile_plan instead.
+    """
+    if mode not in ("monadic", "applicative"):
+        raise ValueError("mode must be 'monadic' or 'applicative'")
+    
+    def compile_rec(p: Plan[State, Ctx]) -> Kleisli[MonadT, State, State]:
+        if isinstance(p, Task):
+            # Convert action to Kleisli
+            action = implementation[p.name]
+            return Kleisli(lambda s: monad_cls.pure(action(s)))
+        
+        elif isinstance(p, SeqNode):
+            # Sequential composition
+            if not p.items:
+                return Kleisli.id(monad_cls)
+            first = compile_rec(p.items[0])
+            rest = compile_rec(SeqNode(p.items[1:])) if len(p.items) > 1 else Kleisli.id(monad_cls)
+            return rest.compose(first)
+        
+        elif isinstance(p, Parallel):
+            # Parallel operations are not supported in Kleisli compilation
+            # Convert to sequential for compatibility
+            if not p.items:
+                return Kleisli.id(monad_cls)
+            
+            # Compile as sequential plan
+            return compile_rec(SeqNode(p.items))
+        
+        elif isinstance(p, Choose):
+            # Choose operations are not supported in Kleisli compilation
+            # Convert to first item for compatibility
+            if not p.items:
+                raise ValueError("Choose with no items")
+            
+            return compile_rec(p.items[0])
+        
+        elif isinstance(p, Focus):
+            # Focus on a sub-state
+            inner = compile_rec(p.inner)
+            return Kleisli(lambda s: 
+                monad_cls.pure(p.lens.set(inner(p.lens.get(s)), s)))
+        
+        elif isinstance(p, LoopWhile):
+            # Loop while predicate is true
+            def loop_run(s: State) -> monad_cls[State]:
+                current = s
+                while p.predicate(current):
+                    result = compile_rec(p.body)(current)
+                    if isinstance(result, monad_cls):
+                        # Extract from monad for loop condition
+                        current = result.get_or_else(current) if hasattr(result, 'get_or_else') else current
+                    else:
+                        current = result
+                return monad_cls.pure(current)
+            
+            return Kleisli(loop_run)
+        
+        else:
+            raise TypeError(f"Unknown plan type: {type(p)}")
+    
+    return compile_rec(plan)
+
+
 # Re-export helper for agents (generic)
 def call_action(fn: Callable[..., TState], x: TState, ctx: Ctx | None) -> TState:
     return _call_action_generic(fn, x, ctx)
@@ -100,112 +173,72 @@ def _compile_plan(
 
         return run_atom
 
-    if isinstance(plan, SeqNode):
-        runners: Tuple[Callable[[State, Ctx | None], State], ...] = tuple(
-            _compile_plan(implementation, p, choose_fn=choose_fn, aggregate_fn=aggregate_fn) for p in plan.items
-        )
+    elif isinstance(plan, SeqNode):
+        items = [_compile_plan(implementation, item, choose_fn=choose_fn, aggregate_fn=aggregate_fn) for item in plan.items]
 
         def run_seq(x: State, ctx: Ctx | None = None) -> State:
             value = x
-            for r in runners:
-                value = r(value, ctx)
+            for item in items:
+                value = item(value, ctx)
             return value
 
         return run_seq
 
-    if isinstance(plan, Parallel):
-        if aggregate_fn is None:
-            raise AssertionError("Parallel requires an aggregate_fn to combine branch outputs")
-        runners: Tuple[Callable[[State, Ctx | None], State], ...] = tuple(
-            _compile_plan(implementation, p, choose_fn=choose_fn, aggregate_fn=aggregate_fn) for p in plan.items
-        )
+    elif isinstance(plan, Parallel):
+        items = [_compile_plan(implementation, item, choose_fn=choose_fn, aggregate_fn=aggregate_fn) for item in plan.items]
 
         def run_par(x: State, ctx: Ctx | None = None) -> State:
-            outputs: List[State] = [r(x, ctx) for r in runners]
+            if not aggregate_fn:
+                raise ValueError("Parallel execution requires aggregate_fn")
+            outputs = [item(x, ctx) for item in items]
             return aggregate_fn(outputs)
 
         return run_par
 
-    if isinstance(plan, Choose):
-        if choose_fn is None:
-            raise AssertionError("Choose requires a choose_fn to select a branch")
-        runners: Tuple[Callable[[State, Ctx | None], State], ...] = tuple(
-            _compile_plan(implementation, p, choose_fn=choose_fn, aggregate_fn=aggregate_fn) for p in plan.items
-        )
+    elif isinstance(plan, Choose):
+        items = [_compile_plan(implementation, item, choose_fn=choose_fn, aggregate_fn=aggregate_fn) for item in plan.items]
 
         def run_choose(x: State, ctx: Ctx | None = None) -> State:
-            outputs: List[State] = [r(x, ctx) for r in runners]
-            idx = choose_fn(outputs)
-            if not (0 <= idx < len(outputs)):
-                raise AssertionError("choose_fn returned invalid index")
-            return outputs[idx]
+            if not choose_fn:
+                raise ValueError("Choose execution requires choose_fn")
+            outputs = [item(x, ctx) for item in items]
+            choice_idx = choose_fn(outputs)
+            return outputs[choice_idx]
 
         return run_choose
 
-    if isinstance(plan, Focus):
-        inner_runner = _compile_plan(implementation, plan.inner, choose_fn=choose_fn, aggregate_fn=aggregate_fn)
+    elif isinstance(plan, Focus):
+        inner = _compile_plan(implementation, plan.inner, choose_fn=choose_fn, aggregate_fn=aggregate_fn)
 
         def run_focus(x: State, ctx: Ctx | None = None) -> State:
-            sub_value = plan.lens.get(x)
-            new_sub = inner_runner(sub_value, ctx)
-            return plan.lens.set(x, new_sub)
+            sub_state = plan.lens.get(x)
+            new_sub_state = inner(sub_state, ctx)
+            return plan.lens.set(x, new_sub_state)
 
         return run_focus
 
-    if isinstance(plan, LoopWhile):
-        body_runner = _compile_plan(implementation, plan.body, choose_fn=choose_fn, aggregate_fn=aggregate_fn)
+    elif isinstance(plan, LoopWhile):
+        body = _compile_plan(implementation, plan.body, choose_fn=choose_fn, aggregate_fn=aggregate_fn)
 
         def run_loop(x: State, ctx: Ctx | None = None) -> State:
-            value = x
-            while plan.predicate(value):
-                value = body_runner(value, ctx)
-            return value
+            current = x
+            while plan.predicate(current):
+                current = body(current, ctx)
+            return current
 
         return run_loop
 
-    raise TypeError("Unknown Plan node")
+    else:
+        raise TypeError(f"Unknown plan type: {type(plan)}")
 
 
-def compile_structured_plan(
+def compile_plan(
     implementation: Mapping[str, Action[State, Ctx]],
     plan: Plan[State, Ctx],
     *,
     choose_fn: ChooseFn | None = None,
     aggregate_fn: AggregateFn | None = None,
-):
+) -> Callable[[State, Ctx | None], State]:
+    """Compile a plan to an executable function."""
     return _compile_plan(implementation, plan, choose_fn=choose_fn, aggregate_fn=aggregate_fn)
-
-
-S = TypeVar("S")
-
-
-def compile_plan_kleisli(
-    implementation: Mapping[str, Action[S, Ctx]],
-    plan: Sequence[str],
-    *,
-    monad_pure: Callable[[S], MonadT[S]],
-    ctx: Ctx | None = None,
-) -> Kleisli[S, S]:
-    """Compile a sequential plan of action names into a Kleisli arrow over a monad.
-
-    - `implementation`: mapping from action name to `(state, ctx?) -> state`
-    - `monad_pure`: constructor for `State -> M State`
-    - `plan`: sequence of action names; evaluated left-to-right via monadic bind
-
-    This compiler is sequential-only; other modes are intentionally unsupported (fail-fast elsewhere).
-    """
-
-    def lift_action(name: str) -> Kleisli[S, S]:
-        if name not in implementation:
-            raise KeyError(f"Unknown action: {name}")
-        fn = implementation[name]
-        return Kleisli(lambda s: monad_pure(_call_action_generic(fn, s, ctx)))
-
-    if not plan:
-        return Kleisli(lambda s: monad_pure(s))
-
-    acc = lift_action(plan[0])
-    for step in plan[1:]:
-        acc = acc.then(lift_action(step))
-    return acc
 

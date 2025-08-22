@@ -13,6 +13,10 @@ class Natural:
 	target: CatFunctor  # G
 	components: Mapping[str, str]  # key: object name X, value: morph name η_X in target cat
 
+	def __repr__(self) -> str:
+		comp_count = len(self.components)
+		return f"Natural({self.source.name} → {self.target.name}, {comp_count} components)"
+
 
 def check_naturality(eta: Natural) -> None:
 	F, G = eta.source, eta.target

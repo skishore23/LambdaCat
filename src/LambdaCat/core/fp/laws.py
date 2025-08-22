@@ -1,15 +1,40 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Generic, Sequence, Tuple, TypeVar
+from typing import Any, Callable, Dict, Generic, Protocol, Sequence, Tuple, TypeVar
 
-from ..laws import Law, LawResult, LawSuite, Violation
 from .typeclasses import ApplicativeT, FunctorT, MonadT
-
 
 A = TypeVar("A")
 B = TypeVar("B")
 C = TypeVar("C")
+
+
+class Law(Protocol, Generic[A]):
+	"""Protocol for laws that can be run on a context."""
+
+	name: str
+	tags: Sequence[str]
+
+	def run(self, ctx: A, config: Dict[str, Any]) -> "LawResult[A]": ...
+
+
+@dataclass(frozen=True)
+class Violation(Generic[A]):
+	"""A violation of a law."""
+
+	law: str
+	message: str
+	witness: Dict[str, Any]
+
+
+@dataclass(frozen=True)
+class LawResult(Generic[A]):
+	"""Result of running a law."""
+
+	law_name: str
+	passed: bool
+	violations: Sequence[Violation[A]]
 
 
 # -----------------------------
@@ -23,26 +48,24 @@ class FunctorIdentityLaw(Law[FunctorT[A]]):
 	tags: Sequence[str] = ("functor",)
 
 	def run(self, ctx: FunctorT[A], config: Dict[str, Any]) -> LawResult[FunctorT[A]]:
-		mapped = ctx.map(lambda x: x)
-		ok = mapped == ctx
+		ok = ctx.map(lambda x: x) == ctx
 		violations: Sequence[Violation[FunctorT[A]]] = () if ok else (
-			Violation(law=self.name, message="map(id) != id", witness={"ctx": ctx}),
+			Violation(law=self.name, message="f.map(id) != f", witness={"ctx": ctx}),
 		)
 		return LawResult(self.name, ok, violations)
 
 
 @dataclass(frozen=True)
-class FunctorCompositionLaw(Law[Tuple[FunctorT[A], Callable[[B], C], Callable[[A], B]]]):
+class FunctorCompositionLaw(Law[Tuple[FunctorT[A], Callable[[A], B], Callable[[B], C]]]):
 	name: str = "functor.composition"
 	tags: Sequence[str] = ("functor",)
 
-	def run(self, ctx: Tuple[FunctorT[A], Callable[[B], C], Callable[[A], B]], config: Dict[str, Any]) -> LawResult[Tuple[FunctorT[A], Callable[[B], C], Callable[[A], B]]]:
-		fa, g, f = ctx
-		lhs = fa.map(lambda a: g(f(a)))
-		rhs = fa.map(f).map(g)
-		ok = lhs == rhs
-		violations: Sequence[Violation[Tuple[FunctorT[A], Callable[[B], C], Callable[[A], B]]]] = () if ok else (
-			Violation(law=self.name, message="map(g∘f) != map(g)∘map(f)", witness={"fa": fa}),
+	def run(self, ctx: Tuple[FunctorT[A], Callable[[A], B], Callable[[B], C]], config: Dict[str, Any]) -> LawResult[Tuple[FunctorT[A], Callable[[A], B], Callable[[B], C]]]:
+		f, g, h = ctx
+		compose = lambda x: h(g(x))
+		ok = f.map(g).map(h) == f.map(compose)
+		violations: Sequence[Violation[Tuple[FunctorT[A], Callable[[A], B], Callable[[B], C]]]] = () if ok else (
+			Violation(law=self.name, message="f.map(g).map(h) != f.map(g . h)", witness={"f": f}),
 		)
 		return LawResult(self.name, ok, violations)
 
@@ -59,6 +82,8 @@ class ApplicativeIdentityLaw(Law[ApplicativeT[A]]):
 
 	def run(self, ctx: ApplicativeT[A], config: Dict[str, Any]) -> LawResult[ApplicativeT[A]]:
 		cls = type(ctx)
+		if not hasattr(cls, "pure"):
+			return LawResult(self.name, False, (Violation(law=self.name, message="class has no pure method", witness={"ctx": ctx}),))
 		lhs = ctx.ap(cls.pure(lambda x: x))
 		ok = lhs == ctx
 		violations: Sequence[Violation[ApplicativeT[A]]] = () if ok else (
@@ -74,6 +99,8 @@ class ApplicativeHomomorphismLaw(Law[Tuple[type, Callable[[A], B], A]]):
 
 	def run(self, ctx: Tuple[type, Callable[[A], B], A], config: Dict[str, Any]) -> LawResult[Tuple[type, Callable[[A], B], A]]:
 		cls, f, x = ctx
+		if not hasattr(cls, "pure"):
+			return LawResult(self.name, False, (Violation(law=self.name, message="class has no pure method", witness={"cls": cls}),))
 		lhs = cls.pure(x).ap(cls.pure(f))
 		rhs = cls.pure(f(x))
 		ok = lhs == rhs
@@ -91,8 +118,10 @@ class ApplicativeInterchangeLaw(Law[Tuple[ApplicativeT[A], Callable[[A], B], A]]
 	def run(self, ctx: Tuple[ApplicativeT[A], Callable[[A], B], A], config: Dict[str, Any]) -> LawResult[Tuple[ApplicativeT[A], Callable[[A], B], A]]:
 		v, f, x = ctx
 		cls = type(v)
-		lhs = cls.pure(x).ap(v.map(lambda g: g))
-		rhs = v.ap(cls.pure(lambda g: g(x)))
+		if not hasattr(cls, "pure"):
+			return LawResult(self.name, False, (Violation(law=self.name, message="class has no pure method", witness={"v": v}),))
+		lhs: ApplicativeT[A] = cls.pure(x).ap(v.map(lambda g: g))
+		rhs: ApplicativeT[A] = v.ap(cls.pure(lambda g: g(x)))
 		ok = lhs == rhs
 		violations: Sequence[Violation[Tuple[ApplicativeT[A], Callable[[A], B], A]]] = () if ok else (
 			Violation(law=self.name, message="pure(x).ap(u.map(id)) != u.ap(pure(lambda g: g(x)))", witness={"x": x}),
@@ -108,9 +137,11 @@ class ApplicativeCompositionLaw(Law[Tuple[ApplicativeT[A], ApplicativeT[Callable
 	def run(self, ctx: Tuple[ApplicativeT[A], ApplicativeT[Callable[[A], B]], ApplicativeT[Callable[[B], C]]], config: Dict[str, Any]) -> LawResult[Tuple[ApplicativeT[A], ApplicativeT[Callable[[A], B]], ApplicativeT[Callable[[B], C]]]]:
 		v, u, w = ctx
 		cls = type(v)
+		if not hasattr(cls, "pure"):
+			return LawResult(self.name, False, (Violation(law=self.name, message="class has no pure method", witness={"v": v}),))
 		compose = lambda g: lambda f: lambda x: g(f(x))
-		lhs = v.ap(u.ap(w.map(compose)))
-		rhs = v.ap(u).ap(w)
+		lhs: ApplicativeT[C] = v.ap(u.ap(w.map(compose)))
+		rhs: ApplicativeT[C] = v.ap(u).ap(w)
 		ok = lhs == rhs
 		violations: Sequence[Violation[Tuple[ApplicativeT[A], ApplicativeT[Callable[[A], B]], ApplicativeT[Callable[[B], C]]]]] = () if ok else (
 			Violation(law=self.name, message="composition law failed", witness={}),
@@ -130,6 +161,8 @@ class MonadLeftIdentityLaw(Law[Tuple[type, Callable[[A], MonadT[B]], A]]):
 
 	def run(self, ctx: Tuple[type, Callable[[A], MonadT[B]], A], config: Dict[str, Any]) -> LawResult[Tuple[type, Callable[[A], MonadT[B]], A]]:
 		cls, f, a = ctx
+		if not hasattr(cls, "pure"):
+			return LawResult(self.name, False, (Violation(law=self.name, message="class has no pure method", witness={"cls": cls}),))
 		lhs = cls.pure(a).bind(f)
 		rhs = f(a)
 		ok = lhs == rhs
@@ -146,6 +179,8 @@ class MonadRightIdentityLaw(Law[MonadT[A]]):
 
 	def run(self, ctx: MonadT[A], config: Dict[str, Any]) -> LawResult[MonadT[A]]:
 		cls = type(ctx)
+		if not hasattr(cls, "pure"):
+			return LawResult(self.name, False, (Violation(law=self.name, message="class has no pure method", witness={"ctx": ctx}),))
 		ok = ctx.bind(lambda x: cls.pure(x)) == ctx
 		violations: Sequence[Violation[MonadT[A]]] = () if ok else (
 			Violation(law=self.name, message="m.bind(pure) != m", witness={"ctx": ctx}),
@@ -164,25 +199,61 @@ class MonadAssociativityLaw(Law[Tuple[MonadT[A], Callable[[A], MonadT[B]], Calla
 		rhs = m.bind(lambda x: f(x).bind(g))
 		ok = lhs == rhs
 		violations: Sequence[Violation[Tuple[MonadT[A], Callable[[A], MonadT[B]], Callable[[B], MonadT[C]]]]] = () if ok else (
-			Violation(law=self.name, message="associativity failed", witness={}),
+			Violation(law=self.name, message="(m >>= f) >>= g != m >>= (\\x -> f x >>= g)", witness={"m": m}),
 		)
 		return LawResult(self.name, ok, violations)
 
 
-# Suites
-FUNCTOR_SUITE: LawSuite[FunctorT[Any]] = LawSuite(
-	name="FUNCTOR_SUITE",
-	laws=(FunctorIdentityLaw(),),
-)
+# -----------------------------
+# Law suites
+# -----------------------------
 
-APPLICATIVE_SUITE: LawSuite[ApplicativeT[Any]] = LawSuite(
-	name="APPLICATIVE_SUITE",
-	laws=(ApplicativeIdentityLaw(),),
-)
 
-MONAD_SUITE: LawSuite[MonadT[Any]] = LawSuite(
-	name="MONAD_SUITE",
-	laws=(MonadRightIdentityLaw(),),
-)
+@dataclass(frozen=True)
+class LawSuite(Generic[A]):
+	"""A collection of laws to run on a context."""
+
+	name: str
+	laws: Sequence[Law[A]]
+
+	def run(self, ctx: A, config: Dict[str, Any]) -> Sequence[LawResult[A]]:
+		"""Run all laws in this suite on the given context."""
+		return [law.run(ctx, config) for law in self.laws]
+
+
+@dataclass(frozen=True)
+class FunctorLawSuite(LawSuite[FunctorT[A]]):
+	"""Laws that every functor must satisfy."""
+
+	name: str = "functor"
+	laws: Sequence[Law[FunctorT[A]]] = (
+		FunctorIdentityLaw[A](),
+		FunctorCompositionLaw[A, A, A](),
+	)
+
+
+@dataclass(frozen=True)
+class ApplicativeLawSuite(LawSuite[ApplicativeT[A]]):
+	"""Laws that every applicative must satisfy."""
+
+	name: str = "applicative"
+	laws: Sequence[Law[ApplicativeT[A]]] = (
+		ApplicativeIdentityLaw[A](),
+		ApplicativeHomomorphismLaw[A, A](),
+		ApplicativeInterchangeLaw[A, A](),
+		ApplicativeCompositionLaw[A, A, A](),
+	)
+
+
+@dataclass(frozen=True)
+class MonadLawSuite(LawSuite[MonadT[A]]):
+	"""Laws that every monad must satisfy."""
+
+	name: str = "monad"
+	laws: Sequence[Law[MonadT[A]]] = (
+		MonadLeftIdentityLaw[A, A](),
+		MonadRightIdentityLaw[A](),
+		MonadAssociativityLaw[A, A, A](),
+	)
 
 

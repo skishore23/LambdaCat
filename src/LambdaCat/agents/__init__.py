@@ -10,7 +10,7 @@ from .actions import (
 	PLAN_MODE,
     Actions,
 )
-from .runtime import sequential_functor , call_action, compile_structured_plan
+from .runtime import sequential_functor, call_action, compile_plan, compile_to_kleisli
 from .runtime import concat, first, argmax
 from .eval import Agent, run_plan, run_structured_plan, choose_best, quick_functor_laws, AgentBuilder
 
@@ -27,7 +27,8 @@ __all__ = [
     "Actions",
 	"sequential_functor",
 	"call_action",
-	"compile_structured_plan",
+	"compile_plan",
+	"compile_to_kleisli",
     "concat",
     "first",
     "argmax",

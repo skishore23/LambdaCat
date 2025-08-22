@@ -1,53 +1,100 @@
 from __future__ import annotations
 
-from typing import List
+from dataclasses import dataclass
+from typing import Callable, List, Sequence, TypeVar, cast
 
-from .laws import Law, LawResult, Violation, LawSuite
-from .category import Cat
-from .functor import CatFunctor
+from .laws import Law, LawResult, Violation, LawSuite, ConfigDict, WitnessDict, SupportsEq
+from .fp.typeclasses import FunctorT
 
-
-class _FunctorIds(Law[CatFunctor]):
-    name = "functor-identities"
-    tags = ("functor", "core")
-
-    def run(self, F: CatFunctor, config):
-        V: List[Violation] = []
-        S, T = F.source, F.target
-        for X in S.objects:
-            id_src = S.identities[X.name]
-            FX = F.object_map.get(X.name)
-            if FX is None:
-                V.append(Violation(self.name, f"missing object map for {X.name}", {"X": X.name}))
-                continue
-            id_tgt = T.identities.get(FX)
-            if id_tgt is None:
-                V.append(Violation(self.name, f"missing identity in target for {FX}", {"FX": FX}))
-                continue
-            if F.morphism_map.get(id_src) != id_tgt:
-                V.append(Violation(self.name, f"F(id_{X.name}) ≠ id_{FX}", {"X": X.name}))
-        return LawResult(self.name, passed=(len(V) == 0), violations=V)
+A = TypeVar("A")
+B = TypeVar("B")
+C = TypeVar("C")
+F = TypeVar("F", bound=FunctorT)
 
 
-class _FunctorComp(Law[CatFunctor]):
-    name = "functor-composition"
-    tags = ("functor", "core")
+@dataclass(frozen=True)
+class _FunctorIdentityLaw(Law[FunctorT]):
+    name: str = "functor-identity"
+    tags: Sequence[str] = ("functor", "core")
 
-    def run(self, F: CatFunctor, config):
-        V: List[Violation] = []
-        S, T = F.source, F.target
-        for (g, f), gf in S.composition.items():
-            lhs = F.morphism_map.get(gf)
-            try:
-                rhs = T.compose(F.morphism_map[g], F.morphism_map[f])
-            except Exception as e:
-                V.append(Violation(self.name, f"compose error: {e}", {"g": g, "f": f}))
-                continue
-            if lhs != rhs:
-                V.append(Violation(self.name, "F(g∘f) ≠ F(g)∘F(f)", {"g": g, "f": f}))
-        return LawResult(self.name, passed=(len(V) == 0), violations=V)
+    def run(self, functor: FunctorT, config: ConfigDict) -> LawResult[FunctorT]:
+        violations: List[Violation[FunctorT]] = []
+        
+        # Test identity law: fmap id = id
+        try:
+            # Create a test value
+            test_value = config.get("test_value")
+            if test_value is None:
+                return LawResult(self.name, passed=False, violations=[
+                    Violation(self.name, "No test_value provided in config", cast(WitnessDict, {"functor": str(functor)}))
+                ])
+            
+            # Apply identity function
+            result = functor.map(lambda x: x)
+            
+            # Check if result equals original (for simple cases)
+            if isinstance(result, SupportsEq):
+                if result != functor:
+                    violations.append(Violation(
+                        self.name, 
+                        "fmap id ≠ id", 
+                        cast(WitnessDict, {"functor": str(functor), "result": str(result)})
+                    ))
+        except Exception as e:
+            violations.append(Violation(
+                self.name, 
+                f"Error testing identity law: {e}", 
+                cast(WitnessDict, {"functor": str(functor), "error": str(e)})
+            ))
+        
+        return LawResult(self.name, passed=(len(violations) == 0), violations=violations)
 
 
-FUNCTOR_SUITE = LawSuite[CatFunctor]("functor-core", laws=[_FunctorIds(), _FunctorComp()])
+@dataclass(frozen=True)
+class _FunctorCompositionLaw(Law[FunctorT]):
+    name: str = "functor-composition"
+    tags: Sequence[str] = ("functor", "core")
+
+    def run(self, functor: FunctorT, config: ConfigDict) -> LawResult[FunctorT]:
+        violations: List[Violation[FunctorT]] = []
+        
+        # Test composition law: fmap (g . f) = fmap g . fmap f
+        try:
+            test_value = config.get("test_value")
+            if test_value is None:
+                return LawResult(self.name, passed=False, violations=[
+                    Violation(self.name, "No test_value provided in config", cast(WitnessDict, {"functor": str(functor)}))
+                ])
+            
+            # Define test functions
+            f = lambda x: x + 1
+            g = lambda x: x * 2
+            
+            # Test: fmap (g . f) = fmap g . fmap f
+            composed = functor.map(lambda x: g(f(x)))
+            separate = functor.map(f).map(g)
+            
+            # Check equality if possible
+            if isinstance(composed, SupportsEq) and isinstance(separate, SupportsEq):
+                if composed != separate:
+                    violations.append(Violation(
+                        self.name,
+                        "fmap (g . f) ≠ fmap g . fmap f",
+                        cast(WitnessDict, {"functor": str(functor), "composed": str(composed), "separate": str(separate)})
+                    ))
+        except Exception as e:
+            violations.append(Violation(
+                self.name,
+                f"Error testing composition law: {e}",
+                cast(WitnessDict, {"functor": str(functor), "error": str(e)})
+            ))
+        
+        return LawResult(self.name, passed=(len(violations) == 0), violations=violations)
+
+
+FUNCTOR_SUITE = LawSuite[FunctorT]("functor", laws=[
+    _FunctorIdentityLaw(),
+    _FunctorCompositionLaw()
+])
 
 

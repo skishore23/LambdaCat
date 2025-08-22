@@ -1,5 +1,0 @@
-# Category
-
-```mermaid
-graph LR
-```

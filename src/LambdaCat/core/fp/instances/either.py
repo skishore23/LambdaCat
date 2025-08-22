@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Generic, Optional, TypeVar
+from typing import Callable, Generic, Optional, TypeVar, Union
 
 
 L = TypeVar("L")
@@ -40,7 +40,9 @@ class Either(Generic[L, A]):
 
 	# Functor.map: map over Right only
 	def map(self, f: Callable[[A], B]) -> "Either[L, B]":
-		return self if self.right is None else Either(left=None, right=f(self.right))
+		if self.right is None:
+			return Either(left=self.left, right=None)  # Left flows through
+		return Either(left=None, right=f(self.right))
 
 	# Applicative.ap: apply Right(function) to Right(value); propagate Left otherwise
 	def ap(self, ff: "Either[L, Callable[[A], B]]") -> "Either[L, B]":
@@ -53,6 +55,8 @@ class Either(Generic[L, A]):
 
 	# Monad.bind: if Right(a), apply f(a); if Left, propagate
 	def bind(self, f: Callable[[A], "Either[L, B]"]) -> "Either[L, B]":
-		return self if self.right is None else f(self.right)
+		if self.right is None:
+			return Either(left=self.left, right=None)
+		return f(self.right)
 
 
