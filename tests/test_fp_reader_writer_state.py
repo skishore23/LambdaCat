@@ -50,7 +50,7 @@ def test_reader_functor_composition(x: int, g: Callable[[int], int], f: Callable
 def test_reader_applicative_identity(x: int, f_id: Callable[[int], int], env: int) -> None:
 	# f_id is unused; enforce shape only
 	v = Reader(lambda _r: x)
-	assert v.ap(Reader(lambda _r: (lambda a: a))).run(env) == v.run(env)
+	assert Reader(lambda _r: (lambda a: a)).ap(v).run(env) == v.run(env)
 
 
 @given(st.integers(), st.sampled_from(int_functions()), st.integers())
@@ -86,13 +86,13 @@ class ListMonoid(Monoid[list[int]]):
 def test_writer_applicative_identity(x: int) -> None:
 	W = ListMonoid()
 	v = Writer.pure(x, W)
-	assert v.ap(Writer.pure(lambda a: a, W)) == v
+	assert Writer.pure(lambda a: a, W).ap(v) == v
 
 
 @given(st.integers(), st.sampled_from(int_functions()))
 def test_writer_applicative_homomorphism(x: int, f: Callable[[int], int]) -> None:
 	W = ListMonoid()
-	assert Writer.pure(x, W).ap(Writer.pure(f, W)) == Writer.pure(f(x), W)
+	assert Writer.pure(f, W).ap(Writer.pure(x, W)) == Writer.pure(f(x), W)
 
 
 @given(st.integers())
@@ -117,7 +117,7 @@ def test_state_functor_identity(x: int, s0: int) -> None:
 def test_state_applicative_identity(x: int, s0: int) -> None:
 	v = State(lambda s: (x, s))
 	id_state = State(lambda s: (lambda a: a, s))
-	assert v.ap(id_state).run(s0) == v.run(s0)
+	assert id_state.ap(v).run(s0) == v.run(s0)
 
 
 @given(st.integers(), st.integers())
