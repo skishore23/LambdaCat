@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from typing import Callable, Generic, TypeVar
+from typing import Callable, TypeVar
 
 import hypothesis.strategies as st
 from hypothesis import given
 
 from LambdaCat.core.fp.instances.reader import Reader
-from LambdaCat.core.fp.instances.writer import Writer
 from LambdaCat.core.fp.instances.state import State
+from LambdaCat.core.fp.instances.writer import Writer
 from LambdaCat.core.fp.typeclasses import Monoid
-
 
 A = TypeVar("A")
 R = TypeVar("R")
@@ -62,8 +61,10 @@ def test_reader_monad_right_identity(x: int, f_id: Callable[[int], int], env: in
 @given(st.integers(), st.sampled_from(int_functions()), st.sampled_from(int_functions()), st.integers())
 def test_reader_monad_associativity(x: int, f: Callable[[int], int], g: Callable[[int], int], env: int) -> None:
 	m = Reader(lambda _r: x)
-	fm = lambda a: Reader(lambda _r: f(a))
-	gm = lambda b: Reader(lambda _r: g(b))
+	def fm(a):
+		return Reader(lambda _r: f(a))
+	def gm(b):
+		return Reader(lambda _r: g(b))
 	left = m.bind(fm).bind(gm).run(env)
 	right = m.bind(lambda a: fm(a).bind(gm)).run(env)
 	assert left == right
@@ -129,8 +130,10 @@ def test_state_monad_right_identity(x: int, s0: int) -> None:
 @given(st.integers(), st.sampled_from(int_functions()), st.sampled_from(int_functions()), st.integers())
 def test_state_monad_associativity(x: int, f: Callable[[int], int], g: Callable[[int], int], s0: int) -> None:
 	m = State(lambda s: (x, s))
-	fm = lambda a: State(lambda s: (f(a), s))
-	gm = lambda b: State(lambda s: (g(b), s))
+	def fm(a):
+		return State(lambda s: (f(a), s))
+	def gm(b):
+		return State(lambda s: (g(b), s))
 	left = m.bind(fm).bind(gm).run(s0)
 	right = m.bind(lambda a: fm(a).bind(gm)).run(s0)
 	assert left == right

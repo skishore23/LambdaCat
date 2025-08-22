@@ -16,27 +16,27 @@ class Result(Generic[A, E]):
 
     # Factories
     @classmethod
-    def ok(cls, value: A) -> "Result[A, E]":
+    def ok(cls, value: A) -> Result[A, E]:
         return Ok(value)
 
     @classmethod
-    def err(cls, error: E) -> "Result[A, E]":
+    def err(cls, error: E) -> Result[A, E]:
         return Err(error)
 
     @classmethod
-    def pure(cls, value: A) -> "Result[A, E]":
+    def pure(cls, value: A) -> Result[A, E]:
         return cls.ok(value)
 
-    def map(self, f: Callable[[A], B]) -> "Result[B, E]":  # pragma: no cover - abstract behavior
+    def map(self, f: Callable[[A], B]) -> Result[B, E]:  # pragma: no cover - abstract behavior
         raise NotImplementedError
 
-    def ap(self, other: "Result[A, E]") -> "Result[B, E]":  # pragma: no cover - abstract behavior
+    def ap(self, other: Result[A, E]) -> Result[B, E]:  # pragma: no cover - abstract behavior
         raise NotImplementedError
 
-    def bind(self, f: Callable[[A], "Result[B, E]"]) -> "Result[B, E]":  # pragma: no cover
+    def bind(self, f: Callable[[A], Result[B, E]]) -> Result[B, E]:  # pragma: no cover
         raise NotImplementedError
 
-    def map_error(self, f: Callable[[E], E]) -> "Result[A, E]":  # pragma: no cover - abstract
+    def map_error(self, f: Callable[[E], E]) -> Result[A, E]:  # pragma: no cover - abstract
         raise NotImplementedError
 
     # Type guards and helpers
@@ -46,7 +46,7 @@ class Result(Generic[A, E]):
     def is_err(self) -> bool:
         return isinstance(self, Err)
 
-    def get_or_else(self: "Result[A, E]", default: A) -> A:
+    def get_or_else(self: Result[A, E], default: A) -> A:
         if isinstance(self, Ok):
             ok_self = cast(Ok[A, E], self)
             return ok_self.value
@@ -57,10 +57,10 @@ class Result(Generic[A, E]):
 class Ok(Result[A, E]):
     value: A
 
-    def map(self, f: Callable[[A], B]) -> "Result[B, E]":
+    def map(self, f: Callable[[A], B]) -> Result[B, E]:
         return Ok(f(self.value))
 
-    def ap(self: "Ok[Callable[[A], B], E]", other: "Result[A, E]") -> "Result[B, E]":
+    def ap(self: Ok[Callable[[A], B], E], other: Result[A, E]) -> Result[B, E]:
         if isinstance(other, Err):
             return Err(other.error)
         if isinstance(other, Ok):
@@ -69,10 +69,10 @@ class Ok(Result[A, E]):
         # Safety: all Result instances are Ok or Err
         raise AssertionError("Unreachable state for Result.ap")
 
-    def bind(self, f: Callable[[A], "Result[B, E]"]) -> "Result[B, E]":
+    def bind(self, f: Callable[[A], Result[B, E]]) -> Result[B, E]:
         return f(self.value)
 
-    def map_error(self, f: Callable[[E], E]) -> "Result[A, E]":
+    def map_error(self, f: Callable[[E], E]) -> Result[A, E]:
         return self
 
     def __repr__(self) -> str:
@@ -83,16 +83,16 @@ class Ok(Result[A, E]):
 class Err(Result[A, E]):
     error: E
 
-    def map(self, f: Callable[[A], B]) -> "Result[B, E]":
+    def map(self, f: Callable[[A], B]) -> Result[B, E]:
         return Err(self.error)
 
-    def ap(self, other: "Result[A, E]") -> "Result[B, E]":
+    def ap(self, other: Result[A, E]) -> Result[B, E]:
         return Err(self.error)
 
-    def bind(self, f: Callable[[A], "Result[B, E]"]) -> "Result[B, E]":
+    def bind(self, f: Callable[[A], Result[B, E]]) -> Result[B, E]:
         return Err(self.error)
 
-    def map_error(self, f: Callable[[E], E]) -> "Result[A, E]":
+    def map_error(self, f: Callable[[E], E]) -> Result[A, E]:
         return Err(f(self.error))
 
     def __repr__(self) -> str:

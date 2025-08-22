@@ -1,10 +1,13 @@
-from typing import Callable, Dict, Generic, List, Mapping, Protocol, Sequence, Tuple, TypeVar
+from collections.abc import Mapping
+from inspect import signature
+from typing import Callable, Generic, Protocol, TypeVar
+
 from LambdaCat.core.fp.kleisli import Kleisli
 from LambdaCat.core.fp.typeclasses import MonadT
-from inspect import signature
-from ..core.presentation import Formal1
-from .actions import Task, Sequence as SeqNode, Parallel, Choose, Focus, LoopWhile, Plan
 
+from ..core.presentation import Formal1
+from .actions import Choose, Focus, LoopWhile, Parallel, Plan, Task
+from .actions import Sequence as SeqNode
 
 State = TypeVar("State")
 Ctx = TypeVar("Ctx")
@@ -53,19 +56,19 @@ def compile_to_kleisli(
     mode: str = "monadic"
 ) -> Kleisli[MonadT[object], State, State]:
     """Compile a plan to a Kleisli arrow for the given monad.
-    
+
     Note: Complex plans with parallel and choose operations may not work correctly
     in Kleisli context. For complex plans, use compile_plan instead.
     """
     if mode not in ("monadic", "applicative"):
         raise ValueError("mode must be 'monadic' or 'applicative'")
-    
+
     def compile_rec(p: Plan[State, Ctx]) -> Kleisli[MonadT[object], State, State]:
         if isinstance(p, Task):
             # Convert action to Kleisli
             action = implementation[p.name]
             return Kleisli(lambda s: monad_cls.pure(action(s)))  # type: ignore[arg-type,return-value]
-        
+
         elif isinstance(p, SeqNode):
             # Sequential composition
             if not p.items:
@@ -73,30 +76,30 @@ def compile_to_kleisli(
             first = compile_rec(p.items[0])
             rest = compile_rec(SeqNode(p.items[1:])) if len(p.items) > 1 else Kleisli.id(monad_cls)
             return rest.compose(first)
-        
+
         elif isinstance(p, Parallel):
             # Parallel operations are not supported in Kleisli compilation
             # Convert to sequential for compatibility
             if not p.items:
                 return Kleisli.id(monad_cls)
-            
+
             # Compile as sequential plan
             return compile_rec(SeqNode(p.items))
-        
+
         elif isinstance(p, Choose):
             # Choose operations are not supported in Kleisli compilation
             # Convert to first item for compatibility
             if not p.items:
                 raise ValueError("Choose with no items")
-            
+
             return compile_rec(p.items[0])
-        
+
         elif isinstance(p, Focus):
             # Focus on a sub-state
             inner = compile_rec(p.inner)
             return Kleisli(lambda s:  # type: ignore[arg-type,return-value]
                 monad_cls.pure(p.lens.set(inner(p.lens.get(s)), s)))
-        
+
         elif isinstance(p, LoopWhile):
             # Loop while predicate is true
             def loop_run(s: State) -> MonadT[object]:  # type: ignore[valid-type]
@@ -109,12 +112,12 @@ def compile_to_kleisli(
                     else:
                         current = result
                 return monad_cls.pure(current)  # type: ignore[assignment]
-            
+
             return Kleisli(loop_run)
-        
+
         else:
             raise TypeError(f"Unknown plan type: {type(p)}")
-    
+
     return compile_rec(plan)
 
 
@@ -124,31 +127,31 @@ def call_action(fn: Callable[..., TState], x: TState, ctx: Ctx | None) -> TState
 
 
 # Structured plan interpreter (Seq / Par / Choose / Focus / LoopWhile)
-ChooseFn = Callable[[List[object]], int]
-AggregateFn = Callable[[List[object]], object]
+ChooseFn = Callable[[list[object]], int]
+AggregateFn = Callable[[list[object]], object]
 
 
 # -------------------------- Helpers for Par/Choose --------------------------
 
 
-def concat(sep: str = "") -> Callable[[List[str]], str]:
-    def _agg(outputs: List[str]) -> str:
+def concat(sep: str = "") -> Callable[[list[str]], str]:
+    def _agg(outputs: list[str]) -> str:
         if not outputs:
             return "" if sep == "" else sep.join([])
         return sep.join(outputs)
     return _agg
 
 
-def first() -> Callable[[List[T]], int]:
-    def _choose(outputs: List[T]) -> int:
+def first() -> Callable[[list[T]], int]:
+    def _choose(outputs: list[T]) -> int:
         if not outputs:
             raise AssertionError("choose on empty outputs")
         return 0
     return _choose
 
 
-def argmax(by: Callable[[T], float]) -> Callable[[List[T]], int]:
-    def _choose(outputs: List[T]) -> int:
+def argmax(by: Callable[[T], float]) -> Callable[[list[T]], int]:
+    def _choose(outputs: list[T]) -> int:
         if not outputs:
             raise AssertionError("choose on empty outputs")
         scores = [by(o) for o in outputs]

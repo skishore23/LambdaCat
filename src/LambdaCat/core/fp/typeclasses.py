@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Callable, Generic, TypeVar, Type, cast
-
+from typing import Callable, Generic, TypeVar, cast
 
 A = TypeVar("A")
 B = TypeVar("B")
@@ -17,7 +16,7 @@ class FunctorT(ABC, Generic[A]):
 	"""
 
 	@abstractmethod
-	def map(self, f: Callable[[A], B]) -> "FunctorT[B]": ...
+	def map(self, f: Callable[[A], B]) -> FunctorT[B]: ...
 
 
 class ApplicativeT(FunctorT[A], ABC, Generic[A]):
@@ -29,10 +28,10 @@ class ApplicativeT(FunctorT[A], ABC, Generic[A]):
 
 	@classmethod
 	@abstractmethod
-	def pure(cls, x: A) -> "ApplicativeT[A]": ...
+	def pure(cls, x: A) -> ApplicativeT[A]: ...
 
 	@abstractmethod
-	def ap(self: "ApplicativeT[Callable[[A], B]]", fa: "ApplicativeT[A]") -> "ApplicativeT[B]": ...
+	def ap(self: ApplicativeT[Callable[[A], B]], fa: ApplicativeT[A]) -> ApplicativeT[B]: ...
 
 
 class MonadT(ApplicativeT[A], ABC, Generic[A]):
@@ -42,7 +41,7 @@ class MonadT(ApplicativeT[A], ABC, Generic[A]):
 	"""
 
 	@abstractmethod
-	def bind(self, f: Callable[[A], "MonadT[B]"]) -> "MonadT[B]": ...
+	def bind(self, f: Callable[[A], MonadT[B]]) -> MonadT[B]: ...
 
 
 def fmap(m: MonadT[A], f: Callable[[A], B]) -> MonadT[B]:
@@ -57,14 +56,14 @@ def fmap(m: MonadT[A], f: Callable[[A], B]) -> MonadT[B]:
 	cls = type(m)
 	if not hasattr(cls, "pure"):
 		raise TypeError("fmap requires a monad class with a 'pure' classmethod")
-	
+
 	# Type-safe implementation using monad's map method instead of bind/pure
 	# This avoids the type inference issue
 	if hasattr(m, "map"):
 		return cast(MonadT[B], m.map(f))
 	else:
 		# Fallback to bind/pure implementation
-		return cast(MonadT[B], m.bind(lambda a: cast(Type[MonadT[B]], cls).pure(f(a))))
+		return cast(MonadT[B], m.bind(lambda a: cast(type[MonadT[B]], cls).pure(f(a))))
 
 
 class Semigroup(ABC, Generic[W]):

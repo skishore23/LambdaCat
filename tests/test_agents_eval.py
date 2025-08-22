@@ -1,5 +1,5 @@
+from LambdaCat.agents.eval import choose_best, quick_functor_laws, run_plan
 from LambdaCat.core.presentation import Formal1
-from LambdaCat.agents.eval import run_plan, choose_best, quick_functor_laws
 
 
 def test_run_and_choose_best():

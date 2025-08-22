@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Callable, List, Sequence, TypeVar, cast
+from typing import TypeVar, cast
 
-from .laws import Law, LawResult, Violation, LawSuite, ConfigDict, WitnessDict, SupportsEq
 from .fp.typeclasses import FunctorT
+from .laws import ConfigDict, Law, LawResult, LawSuite, SupportsEq, Violation, WitnessDict
 
 A = TypeVar("A")
 B = TypeVar("B")
@@ -18,8 +19,8 @@ class _FunctorIdentityLaw(Law[FunctorT]):
     tags: Sequence[str] = ("functor", "core")
 
     def run(self, functor: FunctorT, config: ConfigDict) -> LawResult[FunctorT]:
-        violations: List[Violation[FunctorT]] = []
-        
+        violations: list[Violation[FunctorT]] = []
+
         # Test identity law: fmap id = id
         try:
             # Create a test value
@@ -28,25 +29,25 @@ class _FunctorIdentityLaw(Law[FunctorT]):
                 return LawResult(self.name, passed=False, violations=[
                     Violation(self.name, "No test_value provided in config", cast(WitnessDict, {"functor": str(functor)}))
                 ])
-            
+
             # Apply identity function
             result = functor.map(lambda x: x)
-            
+
             # Check if result equals original (for simple cases)
             if isinstance(result, SupportsEq):
                 if result != functor:
                     violations.append(Violation(
-                        self.name, 
-                        "fmap id ≠ id", 
+                        self.name,
+                        "fmap id ≠ id",
                         cast(WitnessDict, {"functor": str(functor), "result": str(result)})
                     ))
         except Exception as e:
             violations.append(Violation(
-                self.name, 
-                f"Error testing identity law: {e}", 
+                self.name,
+                f"Error testing identity law: {e}",
                 cast(WitnessDict, {"functor": str(functor), "error": str(e)})
             ))
-        
+
         return LawResult(self.name, passed=(len(violations) == 0), violations=violations)
 
 
@@ -56,8 +57,8 @@ class _FunctorCompositionLaw(Law[FunctorT]):
     tags: Sequence[str] = ("functor", "core")
 
     def run(self, functor: FunctorT, config: ConfigDict) -> LawResult[FunctorT]:
-        violations: List[Violation[FunctorT]] = []
-        
+        violations: list[Violation[FunctorT]] = []
+
         # Test composition law: fmap (g . f) = fmap g . fmap f
         try:
             test_value = config.get("test_value")
@@ -65,15 +66,17 @@ class _FunctorCompositionLaw(Law[FunctorT]):
                 return LawResult(self.name, passed=False, violations=[
                     Violation(self.name, "No test_value provided in config", cast(WitnessDict, {"functor": str(functor)}))
                 ])
-            
+
             # Define test functions
-            f = lambda x: x + 1
-            g = lambda x: x * 2
-            
+            def f(x):
+                return x + 1
+            def g(x):
+                return x * 2
+
             # Test: fmap (g . f) = fmap g . fmap f
             composed = functor.map(lambda x: g(f(x)))
             separate = functor.map(f).map(g)
-            
+
             # Check equality if possible
             if isinstance(composed, SupportsEq) and isinstance(separate, SupportsEq):
                 if composed != separate:
@@ -88,7 +91,7 @@ class _FunctorCompositionLaw(Law[FunctorT]):
                 f"Error testing composition law: {e}",
                 cast(WitnessDict, {"functor": str(functor), "error": str(e)})
             ))
-        
+
         return LawResult(self.name, passed=(len(violations) == 0), violations=violations)
 
 

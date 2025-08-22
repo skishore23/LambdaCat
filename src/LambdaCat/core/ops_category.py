@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from types import MappingProxyType
-from typing import Dict, Iterable, List, Sequence, Tuple
 
 from .category import Cat
 from .presentation import Obj
@@ -9,11 +9,11 @@ from .presentation import Obj
 
 def opposite_category(C: Cat) -> Cat:
     # create op arrow names by suffixing ^op and swapping endpoints
-    op_arrows = tuple(
+    tuple(
         (f"{a.name}^op", a.target, a.source) for a in C.arrows
     )
     # mapping original name -> op name
-    to_op: Dict[str, str] = {a.name: f"{a.name}^op" for a in C.arrows}
+    to_op: dict[str, str] = {a.name: f"{a.name}^op" for a in C.arrows}
     # composition: (g^op, f^op) = (f∘g)^op in C^op
     comp = MappingProxyType({
         (to_op[g], to_op[f]): to_op[gf] for (g, f), gf in C.composition.items()
@@ -29,7 +29,7 @@ def opposite_category(C: Cat) -> Cat:
 
 # --------------------------- Diagrams and paths ---------------------------
 
-def paths(C: Cat, source: str, target: str, *, max_length: int = 4) -> List[List[str]]:
+def paths(C: Cat, source: str, target: str, *, max_length: int = 4) -> list[list[str]]:
     """Enumerate arrow-name paths from source to target up to max_length.
 
     Paths are sequences [f1, f2, ..., fn] such that dom(f1)=source, cod(fi)=dom(f{i+1}), cod(fn)=target.
@@ -38,13 +38,13 @@ def paths(C: Cat, source: str, target: str, *, max_length: int = 4) -> List[List
         raise ValueError("max_length must be non-negative")
     by_name = {a.name: a for a in C.arrows}
     # adjacency: from object name -> list of outgoing arrow names
-    out: Dict[str, List[str]] = {}
+    out: dict[str, list[str]] = {}
     for a in C.arrows:
         out.setdefault(a.source, []).append(a.name)
 
-    results: List[List[str]] = []
+    results: list[list[str]] = []
 
-    def extend(current_obj: str, acc: List[str], depth: int) -> None:
+    def extend(current_obj: str, acc: list[str], depth: int) -> None:
         if depth > max_length:
             return
         if current_obj == target and acc:
@@ -60,7 +60,7 @@ def paths(C: Cat, source: str, target: str, *, max_length: int = 4) -> List[List
 
 
 class CommutativityReport:
-    def __init__(self, ok: bool, composites: Dict[Tuple[str, ...], str], mismatch: Tuple[Tuple[str, ...], Tuple[str, ...]] | None):
+    def __init__(self, ok: bool, composites: dict[tuple[str, ...], str], mismatch: tuple[tuple[str, ...], tuple[str, ...]] | None):
         self.ok = ok
         self.composites = composites
         self.mismatch = mismatch
@@ -78,7 +78,7 @@ def check_commutativity(C: Cat, A: str, B: str, candidate_paths: Sequence[Sequen
 
     Returns CommutativityReport with computed composites and first mismatch.
     """
-    composites: Dict[Tuple[str, ...], str] = {}
+    composites: dict[tuple[str, ...], str] = {}
     for p in candidate_paths:
         if not p:
             continue
@@ -99,15 +99,15 @@ def check_commutativity(C: Cat, A: str, B: str, candidate_paths: Sequence[Sequen
             if ah.target != B:
                 # Skip paths that don't end at the target - they're not valid for commutativity
                 continue
-        except Exception as e:
+        except Exception:
             # Skip paths that have composition errors
             continue
         composites[tuple(p)] = acc
-    
+
     # If no valid paths, return success (trivially commutative)
     if not composites:
         return CommutativityReport(True, composites, None)
-    
+
     # Pairwise compare
     items = list(composites.items())
     for i in range(len(items)):
@@ -126,13 +126,13 @@ def slice_category(C: Cat, A: str) -> Cat:
     - Morphisms: for f: A->X and g: A->Y, a morphism f -> g is an arrow h: X->Y in C such that h ∘ f = g
       We name such morphisms as "h[f->g]" to ensure global uniqueness.
     """
-    from .presentation import Obj, ArrowGen
+    from .presentation import ArrowGen
     # Collect objects: all arrows with source A
     objs = tuple(Obj(a.name) for a in C.arrows if a.source == A)
-    obj_names = {o.name for o in objs}  # equal to f-names
+    {o.name for o in objs}  # equal to f-names
     # identities in slice: for each f: A->X, identity is id_X with witness id_X ∘ f = f
-    ids: Dict[str, str] = {}
-    arrows_list: List[Tuple[str, str, str]] = []  # (name, src_obj, tgt_obj) in slice
+    ids: dict[str, str] = {}
+    arrows_list: list[tuple[str, str, str]] = []  # (name, src_obj, tgt_obj) in slice
     # Map arrow names to underlying ArrowGen for typing
     by_name = {a.name: a for a in C.arrows}
     # Build all candidate morphisms: for f and g, any h: X->Y with h∘f = g
@@ -161,9 +161,9 @@ def slice_category(C: Cat, A: str) -> Cat:
                     except Exception:
                         continue
     # Build Cat pieces
-    arrow_gens = tuple(ArrowGen(name, src, tgt) for (name, src, tgt) in arrows_list)
+    tuple(ArrowGen(name, src, tgt) for (name, src, tgt) in arrows_list)
     # composition: inherited from C on underlying h names
-    comp: Dict[Tuple[str, str], str] = {}
+    comp: dict[tuple[str, str], str] = {}
     # Identities already added: (id_f, id_f) -> id_f
     for f in objs:
         idf = f"id:{f.name}"
@@ -171,7 +171,7 @@ def slice_category(C: Cat, A: str) -> Cat:
             comp[(idf, idf)] = idf
     # Compose two morphisms h1[f->g] and h2[g->k] yields (h2∘h1)[f->k]
     # We can parse names back
-    def _parse(name: str) -> Tuple[str, str, str] | None:
+    def _parse(name: str) -> tuple[str, str, str] | None:
         # format: h[H]:F->G
         if not name.startswith("h[") or "]:" not in name or "->" not in name:
             return None
@@ -180,8 +180,8 @@ def slice_category(C: Cat, A: str) -> Cat:
         F, G = rest.split("->", 1)
         return (H, F, G)
     names = {n for (n, _, _) in arrows_list}
-    for n2, s2, t2 in arrows_list:
-        for n1, s1, t1 in arrows_list:
+    for n2, _s2, _t2 in arrows_list:
+        for n1, _s1, _t1 in arrows_list:
             p2 = _parse(n2)
             p1 = _parse(n1)
             if p2 is None or p1 is None:

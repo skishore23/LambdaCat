@@ -1,5 +1,5 @@
-from LambdaCat.core.presentation import Formal1
 from LambdaCat.agents.runtime import sequential_functor
+from LambdaCat.core.presentation import Formal1
 
 
 def test_agent_pipeline_runs():

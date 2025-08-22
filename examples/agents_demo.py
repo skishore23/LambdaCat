@@ -1,15 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Callable, List, Mapping
+from typing import Any, Callable
 
-from LambdaCat.core.presentation import Formal1
-from LambdaCat.agents.actions import Task, sequence, parallel, choose, focus, loop_while
+from LambdaCat.agents.actions import Task, choose, focus, loop_while, parallel, sequence
 from LambdaCat.agents.runtime import compile_plan, compile_to_kleisli
 from LambdaCat.core.fp.instances.option import Option
 from LambdaCat.core.optics import Lens
-from pathlib import Path
-
 
 # -----------------------------
 # Pure actions (state -> state)
@@ -80,10 +78,10 @@ def demo_linear_plan(input_text: str) -> None:
     # Execute both plans and compare results
     executable_a = compile_plan(Implementation, plan_a)
     executable_b = compile_plan(Implementation, plan_b)
-    
+
     result_a = executable_a(input_text)
     result_b = executable_b(input_text)
-    
+
     # Choose the shorter result (simple heuristic)
     if len(result_a) <= len(result_b):
         chosen_plan = "Plan A"
@@ -114,17 +112,17 @@ def demo_structured_plan(input_text: str) -> None:
     # Execute the plan with aggregation for parallel results
     def aggregate_parallel(results):
         return " | ".join(str(r) for r in results)
-    
+
     def choose_first(results):
         return 0 if results else 0  # Return index, not the result itself
 
-    executable = compile_plan(Implementation, plan, 
+    executable = compile_plan(Implementation, plan,
                             aggregate_fn=aggregate_parallel,
                             choose_fn=choose_first)
     result = executable(input_text)
-    
+
     print(f"[Structured] output: {result}")
-    
+
     # Also demonstrate Kleisli compilation
     kleisli_plan = compile_to_kleisli(Implementation, plan, Option)
     kleisli_result = kleisli_plan(input_text)
@@ -147,20 +145,20 @@ def demo_focus_plan(article: Article) -> None:
         get=lambda a: a.body,
         set=lambda new_body, a: Article(title=a.title, body=new_body)
     )
-    
+
     # Create a plan that focuses on the body
     body_processing_plan = sequence(
-        Task("strip_ws"), 
-        Task("to_lower"), 
+        Task("strip_ws"),
+        Task("to_lower"),
         Task("normalize_ws")
     )
-    
+
     plan = focus(body_lens, body_processing_plan)
-    
+
     # Execute the focused plan
     executable = compile_plan(Implementation, plan)
     result = executable(article)
-    
+
     print(f"[Focus] Original title: {article.title}")
     print(f"[Focus] Original body: '{article.body}'")
     if hasattr(result, 'title') and hasattr(result, 'body'):
@@ -193,7 +191,7 @@ def demo_loop_and_choose(input_text: str) -> None:
 
     executable = compile_plan(Implementation, plan, choose_fn=choose_longest)
     result = executable(input_text)
-    
+
     print(f"[Loop+Choose] input: {input_text}")
     print(f"[Loop+Choose] output: {result}")
 
@@ -209,11 +207,11 @@ def demo_simple_execution() -> None:
         Task("to_lower"),
         Task("normalize_ws")
     )
-    
+
     executable = compile_plan(Implementation, plan)
     sample = "  HELLO, World!!  "
     result = executable(sample)
-    
+
     print(f"[Simple] input: '{sample}'")
     print(f"[Simple] output: '{result}'")
 
@@ -222,26 +220,26 @@ def main() -> None:
     """Run all agent demos."""
     print("🤖 LambdaCat Agent Framework Demo")
     print("=" * 40)
-    
+
     sample = "  Hello, Lambda-Cat!!  AI agents, composable and typed.  "
-    
+
     print("\n1. Simple Sequential Execution:")
     demo_simple_execution()
-    
+
     print("\n2. Linear Plan Comparison:")
     demo_linear_plan(sample)
-    
+
     print("\n3. Structured Plan (Parallel + Choose):")
     demo_structured_plan(sample)
-    
+
     print("\n4. Focus with Lenses:")
     art = Article(title="Note", body="   A Small SAMPLE body, with   noise!!   ")
     demo_focus_plan(art)
-    
+
     print("\n5. Loop + Choose:")
     noisy_sample = "  Hello!! Lambda-Cat!! with noise!!  "
     demo_loop_and_choose(noisy_sample)
-    
+
     print("\n🎉 All agent demos completed successfully!")
 
 

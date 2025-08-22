@@ -1,15 +1,22 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Dict, Generic, Iterable, List, Optional, Protocol, Sequence, Tuple, TypeVar, Union, runtime_checkable
+from typing import (
+	Generic,
+	Protocol,
+	TypeVar,
+	Union,
+	runtime_checkable,
+)
 
 T = TypeVar("T")
 
 # Type aliases for better type safety
 WitnessValue = Union[str, int, float, bool, None, T]
-WitnessDict = Dict[str, WitnessValue]
-ConfigValue = Union[str, int, float, bool, None, List["ConfigValue"], Dict[str, "ConfigValue"]]
-ConfigDict = Dict[str, ConfigValue]
+WitnessDict = dict[str, WitnessValue]
+ConfigValue = Union[str, int, float, bool, None, list["ConfigValue"], dict[str, "ConfigValue"]]
+ConfigDict = dict[str, ConfigValue]
 
 
 @runtime_checkable
@@ -58,7 +65,7 @@ class SuiteReport(Generic[T]):
 		passed_count = sum(1 for r in self.results if r.passed)
 		total_count = len(self.results)
 		status_line = f"Suite {self.suite}: {'OK' if self.ok else 'FAIL'} (laws passed: {passed_count}/{total_count})"
-		
+
 		lines = [status_line]
 		for r in self.results:
 			status = "✓" if r.passed else "✗"
@@ -69,7 +76,7 @@ class SuiteReport(Generic[T]):
 		return "\n".join(lines)
 
 
-def run_suite(ctx: T, suite: LawSuite[T], *, config: Optional[ConfigDict] = None) -> SuiteReport[T]:
+def run_suite(ctx: T, suite: LawSuite[T], *, config: ConfigDict | None = None) -> SuiteReport[T]:
 	cfg = config or {}
 	return SuiteReport[T](suite=suite.name, results=[law.run(ctx, cfg) for law in suite.laws])
 

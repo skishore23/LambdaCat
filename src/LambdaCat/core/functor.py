@@ -1,17 +1,18 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Callable, Dict, Mapping, Tuple
+from typing import Callable
 
-from .presentation import Formal1
 from .category import Cat
+from .presentation import Formal1
 
 
 @dataclass(frozen=True)
 class Functor:
 	name: str
-	object_map: Dict[str, str]
-	morphism_map: Dict[str, str]
+	object_map: dict[str, str]
+	morphism_map: dict[str, str]
 
 	def __repr__(self) -> str:
 		obj_count = len(self.object_map)
@@ -33,7 +34,7 @@ class CatFunctor:
 	morphism_map: Mapping[str, str]
 
 	# FunctorT instance (map on morphism names as values)
-	def map(self, f: Callable[[object], object]) -> "CatFunctor":
+	def map(self, f: Callable[[object], object]) -> CatFunctor:
 		# No-op map since CatFunctor is not a value container; provided for law harness compatibility
 		return self
 
@@ -50,15 +51,15 @@ class FunctorBuilder:
 		self.name = name
 		self.source = source
 		self.target = target
-		self._obj: Dict[str, str] = {}
-		self._mor: Dict[str, str] = {}
+		self._obj: dict[str, str] = {}
+		self._mor: dict[str, str] = {}
 
-	def on_objects(self, mapping: Dict[str, str]) -> "FunctorBuilder":
+	def on_objects(self, mapping: dict[str, str]) -> FunctorBuilder:
 		for s_name, t_name in mapping.items():
 			self._obj[s_name] = t_name
 		return self
 
-	def on_morphisms(self, mapping: Dict[str, str]) -> "FunctorBuilder":
+	def on_morphisms(self, mapping: dict[str, str]) -> FunctorBuilder:
 		for s_name, t_name in mapping.items():
 			self._mor[s_name] = t_name
 		return self

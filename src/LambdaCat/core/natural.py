@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 
 from .category import Cat
 from .functor import CatFunctor
@@ -43,7 +43,7 @@ def check_naturality(eta: Natural) -> None:
 			eta_X_arrow = next(ax for ax in T.arrows if ax.name == eta_X)
 			eta_Y_arrow = next(ay for ay in T.arrows if ay.name == eta_Y)
 		except StopIteration:
-			raise AssertionError(f"Missing component arrow in target for η_{X} or η_{Y}")
+			raise AssertionError(f"Missing component arrow in target for η_{X} or η_{Y}") from None
 		FX = F.object_map.get(X)
 		GX = G.object_map.get(X)
 		FY = F.object_map.get(Y)
@@ -63,7 +63,7 @@ def check_naturality(eta: Natural) -> None:
 			left = T.compose(eta_Y, Ff)
 			right = T.compose(Gf, eta_X)
 		except KeyError as e:
-			raise AssertionError(f"Composition missing while checking naturality for {f}: {e}")
+			raise AssertionError(f"Composition missing while checking naturality for {f}: {e}") from None
 		if left != right:
 			raise AssertionError(f"Naturality failed on {f}: η_Y ∘ F(f) != G(f) ∘ η_X")
 

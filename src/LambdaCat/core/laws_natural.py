@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import List
-
-from .laws import Law, LawResult, Violation, LawSuite
+from .laws import Law, LawResult, LawSuite, Violation
 from .natural import Natural
 
 
@@ -11,7 +9,7 @@ class _NaturalityWellTyped(Law[Natural]):
     tags = ("natural", "core")
 
     def run(self, eta: Natural, config):
-        V: List[Violation] = []
+        V: list[Violation] = []
         F, G = eta.source, eta.target
         if not (F.source is G.source and F.target is G.target):
             V.append(Violation(self.name, "Functors must have same source/target", {}))
@@ -52,7 +50,7 @@ class _NaturalitySquares(Law[Natural]):
     tags = ("natural", "core")
 
     def run(self, eta: Natural, config):
-        V: List[Violation] = []
+        V: list[Violation] = []
         F, G = eta.source, eta.target
         S = F.source
         T = F.target

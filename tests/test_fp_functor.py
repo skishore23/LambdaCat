@@ -5,9 +5,9 @@ from typing import Callable
 import hypothesis.strategies as st
 from hypothesis import given
 
+from LambdaCat.core.fp.instances.either import Either
 from LambdaCat.core.fp.instances.identity import Id
 from LambdaCat.core.fp.instances.maybe import Maybe
-from LambdaCat.core.fp.instances.either import Either
 
 
 def int_functions() -> list[Callable[[int], int]]:
@@ -71,8 +71,10 @@ def test_functor_composition_either_right(x: int, g: Callable[[int], int], f: Ca
 
 def test_functor_composition_either_left() -> None:
 	fx: Either[str, int] = Either.left_value("err")
-	g = lambda x: x + 1
-	f = lambda x: x * 2
+	def g(x):
+		return x + 1
+	def f(x):
+		return x * 2
 	lhs = fx.map(lambda a: g(f(a)))
 	rhs = fx.map(f).map(g)
 	assert lhs == rhs

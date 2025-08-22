@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from types import MappingProxyType
-from typing import Dict, Iterable, Set, Tuple
 
-from .presentation import Obj, ArrowGen
 from .category import Cat
+from .presentation import ArrowGen, Obj
 
 
 def terminal_category(name: str = "Terminal") -> Cat:
@@ -23,12 +23,12 @@ def terminal_category(name: str = "Terminal") -> Cat:
 
 def discrete(objects: list[str], name: str = "Discrete") -> Cat:
     """
-    >>> C = discrete(["A","B"]) 
+    >>> C = discrete(["A","B"])
     >>> C.compose('id:A', 'id:A')
     'id:A'
     """
     objs = tuple(Obj(o) for o in objects)
-    ids: Dict[str, str] = {o.name: f"id:{o.name}" for o in objs}
+    ids: dict[str, str] = {o.name: f"id:{o.name}" for o in objs}
     arrows = tuple(ArrowGen(ids[o.name], o.name, o.name) for o in objs)
     composition = MappingProxyType({(i, i): i for i in ids.values()})
     identities = MappingProxyType(ids)
@@ -43,9 +43,9 @@ def simplex(n: int, name: str | None = None) -> Cat:
     """
     # Δ^n with objects 0..n and unique i->j for i<=j
     objs = tuple(Obj(str(i)) for i in range(n + 1))
-    ids: Dict[str, str] = {o.name: f"id:{o.name}" for o in objs}
-    arr: Dict[Tuple[int, int], str] = {}
-    morph_names: Set[str] = set()
+    ids: dict[str, str] = {o.name: f"id:{o.name}" for o in objs}
+    arr: dict[tuple[int, int], str] = {}
+    morph_names: set[str] = set()
     # identities
     for i, o in enumerate(objs):
         arr[(i, i)] = ids[o.name]
@@ -95,10 +95,10 @@ def walking_isomorphism(name: str = "Iso") -> Cat:
     return Cat(objects=(A, B), arrows=arrows, composition=dict(composition), identities=dict(identities))
 
 
-def monoid_category(elements: Iterable[str], op: Dict[tuple[str, str], str], unit: str) -> Cat:
+def monoid_category(elements: Iterable[str], op: dict[tuple[str, str], str], unit: str) -> Cat:
     """
     Create a one-object category from a monoid.
-    
+
     >>> elems = ['id:*', 'a', 'b']
     >>> op = {('id:*', 'id:*'): 'id:*', ('id:*', 'a'): 'a', ('a', 'id:*'): 'a',
     ...       ('a', 'a'): 'b', ('a', 'b'): 'a', ('b', 'a'): 'b', ('b', 'b'): 'a'}
@@ -109,20 +109,20 @@ def monoid_category(elements: Iterable[str], op: Dict[tuple[str, str], str], uni
     # One object category
     obj = Obj("*")
     objs = (obj,)
-    
+
     # All elements become arrows from * to *
     arrows = tuple(ArrowGen(elem, "*", "*") for elem in elements)
-    
+
     # Composition table from monoid operation
     composition = MappingProxyType(op)
-    
+
     # Identity is the unit
     identities = MappingProxyType({"*": unit})
-    
+
     return Cat(objects=objs, arrows=arrows, composition=dict(composition), identities=dict(identities))
 
 
-def poset_category(P: Iterable[str], leq: Dict[tuple[str, str], bool]) -> Cat:
+def poset_category(P: Iterable[str], leq: dict[tuple[str, str], bool]) -> Cat:
     """
     >>> leq = {('A','A'): True, ('B','B'): True, ('A','B'): True}
     >>> C = poset_category(['A','B'], leq)
@@ -134,7 +134,7 @@ def poset_category(P: Iterable[str], leq: Dict[tuple[str, str], bool]) -> Cat:
     leq provided as a boolean predicate table on pairs (x,y).
     """
     objs = tuple(Obj(x) for x in P)
-    ids: Dict[str, str] = {o.name: f"id:{o.name}" for o in objs}
+    ids: dict[str, str] = {o.name: f"id:{o.name}" for o in objs}
     # Arrows: identities plus one arrow x->y whenever x ≤ y and x != y
     arrow_list: list[ArrowGen] = []
     for o in objs:
@@ -145,7 +145,7 @@ def poset_category(P: Iterable[str], leq: Dict[tuple[str, str], bool]) -> Cat:
                 arrow_list.append(ArrowGen(f"{x.name}->{y.name}", x.name, y.name))
     arrows = tuple(arrow_list)
     # composition: transitivity
-    comp: Dict[tuple[str, str], str] = {}
+    comp: dict[tuple[str, str], str] = {}
     for x in objs:
         for y in objs:
             for z in objs:

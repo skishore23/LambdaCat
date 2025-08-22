@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Protocol
-from ..core.diagram import Diagram
+from typing import Any, Protocol
 
 
 def _fence(body: str) -> str:
@@ -52,7 +52,7 @@ def _arr_name(arrow: _ArrowLike) -> str:
 
 
 def category_mermaid(C: _CategoryLike | Any, *, hide_id: bool = True) -> str:
-    lines: List[str] = ["graph LR"]
+    lines: list[str] = ["graph LR"]
     arrows = sorted(_iter_arrows(C), key=lambda a: _arr_name(a))
     for a in arrows:
         name = _arr_name(a)
@@ -63,7 +63,7 @@ def category_mermaid(C: _CategoryLike | Any, *, hide_id: bool = True) -> str:
 
 
 def diagram_mermaid(D: Any) -> str:
-    lines: List[str] = ["graph LR"]
+    lines: list[str] = ["graph LR"]
     for (s, t, name) in getattr(D, "edges", ()):  # type: ignore[attr-defined]
         lines.append(f'  {s} -- "{name}" --> {t}')
     return _fence("\n".join(lines))
@@ -86,7 +86,7 @@ def functor_mermaid(F: Any) -> str:
     tgt.append("end")
 
     # Object map: Mapping[str,str] for CatFunctor
-    links: List[str] = []
+    links: list[str] = []
     if hasattr(F, "object_map") and isinstance(F.object_map, dict):
         for s_name, t_name in sorted(F.object_map.items(), key=lambda kv: kv[0]):
             links.append(f'  {nid("S", s_name)} -.-> {nid("T", t_name)}:::map')
@@ -117,8 +117,8 @@ def plan_mermaid(plan: Any) -> str:
     nodes = ["in"] + [f"s{i}" for i in range(1, len(factors) + 1)] + ["out"]
     labels = ["⟦input⟧"] + list(factors) + ["⟦output⟧"]
     lines = ["graph LR"]
-    for n, l in zip(nodes, labels):
-        lines.append(f'  {n}["{l}"]')
+    for n, label in zip(nodes, labels):
+        lines.append(f'  {n}["{label}"]')
     for i in range(len(nodes) - 1):
         lines.append(f"  {nodes[i]} --> {nodes[i+1]}")
     return _fence("\n".join(lines))
@@ -134,17 +134,17 @@ def exec_gantt_mermaid(report_or_trace: Any) -> str:
     # Accept RunReport with .trace (sequence of StepTrace with duration_ms), or a custom trace with .steps
     steps = None
     if hasattr(report_or_trace, "trace"):
-        steps = getattr(report_or_trace, "trace")
+        steps = report_or_trace.trace
     elif hasattr(report_or_trace, "steps"):
-        steps = getattr(report_or_trace, "steps")
+        steps = report_or_trace.steps
     else:
         return _fence("gantt\n  dateFormat X\n  axisFormat %L\n  %% (no steps)")
     durations = [getattr(s, "duration_ms", None) for s in steps]  # type: ignore[arg-type]
     if any(d is None for d in durations):
         return _fence("gantt\n  dateFormat X\n  axisFormat %L\n  %% (missing durations)")
     # Build cumulative start/end (ms)
-    starts: List[int] = []
-    ends: List[int] = []
+    starts: list[int] = []
+    ends: list[int] = []
     t = 0
     for d in durations:
         starts.append(int(t))
@@ -162,19 +162,19 @@ def exec_gantt_mermaid(report_or_trace: Any) -> str:
 
 
 def _is_task(node: Any) -> bool:
-    return hasattr(node, "name") and isinstance(getattr(node, "name"), str) and not hasattr(node, "items")
+    return hasattr(node, "name") and isinstance(node.name, str) and not hasattr(node, "items")
 
 
 def _is_sequence(node: Any) -> bool:
-    return hasattr(node, "items") and isinstance(getattr(node, "items"), (list, tuple)) and type(node).__name__ == "Sequence"
+    return hasattr(node, "items") and isinstance(node.items, (list, tuple)) and type(node).__name__ == "Sequence"
 
 
 def _is_parallel(node: Any) -> bool:
-    return hasattr(node, "items") and isinstance(getattr(node, "items"), (list, tuple)) and type(node).__name__ == "Parallel"
+    return hasattr(node, "items") and isinstance(node.items, (list, tuple)) and type(node).__name__ == "Parallel"
 
 
 def _is_choose(node: Any) -> bool:
-    return hasattr(node, "items") and isinstance(getattr(node, "items"), (list, tuple)) and type(node).__name__ == "Choose"
+    return hasattr(node, "items") and isinstance(node.items, (list, tuple)) and type(node).__name__ == "Choose"
 
 
 def _is_focus(node: Any) -> bool:
@@ -187,7 +187,7 @@ def _is_loop(node: Any) -> bool:
 
 def structured_plan_mermaid(plan: Any) -> str:
     """Render a structured plan (Task/Sequence/Parallel/Choose/Focus/LoopWhile)."""
-    lines: List[str] = ["flowchart TD"]
+    lines: list[str] = ["flowchart TD"]
     counter = {"n": 0}
 
     def nid() -> str:
@@ -197,13 +197,13 @@ def structured_plan_mermaid(plan: Any) -> str:
     def walk(node: Any) -> str:
         if _is_task(node):
             node_id = nid()
-            lines.append(f'  {node_id}["task: {getattr(node, "name")}"]')
+            lines.append(f'  {node_id}["task: {node.name}"]')
             return node_id
         if _is_sequence(node):
             seq_id = nid()
             lines.append(f'  {seq_id}((sequence))')
             prev = seq_id
-            for child in getattr(node, "items"):
+            for child in node.items:
                 cid = walk(child)
                 lines.append(f"  {prev} --> {cid}")
                 prev = cid
@@ -211,27 +211,27 @@ def structured_plan_mermaid(plan: Any) -> str:
         if _is_parallel(node):
             par_id = nid()
             lines.append(f'  {par_id}((parallel))')
-            for child in getattr(node, "items"):
+            for child in node.items:
                 cid = walk(child)
                 lines.append(f"  {par_id} --> {cid}")
             return par_id
         if _is_choose(node):
             ch_id = nid()
             lines.append(f'  {ch_id}{{"choose"}}')
-            for child in getattr(node, "items"):
+            for child in node.items:
                 cid = walk(child)
                 lines.append(f"  {ch_id} --> {cid}")
             return ch_id
         if _is_focus(node):
             f_id = nid()
             lines.append(f'  {f_id}[["focus(lens)"]]')
-            cid = walk(getattr(node, "inner"))
+            cid = walk(node.inner)
             lines.append(f"  {f_id} --> {cid}")
             return f_id
         if _is_loop(node):
             l_id = nid()
             lines.append(f'  {l_id}{{"loop_while"}}')
-            cid = walk(getattr(node, "body"))
+            cid = walk(node.body)
             lines.append(f"  {l_id} --> {cid}")
             lines.append(f"  {cid} --> {l_id}")
             return l_id
@@ -297,8 +297,8 @@ flowchart LR
 # --------------------------------- Orchestrator ------------------------------
 
 def render_all(
-    items: Dict[str, Any], *, out_dir: Optional[str] = None, naturality_sample_limit: Optional[int] = 24
-) -> Dict[str, str]:
+    items: dict[str, Any], *, out_dir: str | None = None, naturality_sample_limit: int | None = 24
+) -> dict[str, str]:
     """
     items: {name: object} where object can be:
       - Category-like (has .arrows or .morphisms)
@@ -310,7 +310,7 @@ def render_all(
     Returns: {filename.md: markdown_with_mermaid}
     If out_dir is provided, also writes files there.
     """
-    out: Dict[str, str] = {}
+    out: dict[str, str] = {}
 
     def _write(fname: str, md: str) -> None:
         out[fname] = md
@@ -326,7 +326,7 @@ def render_all(
         # Natural?
         if all(hasattr(obj, a) for a in ("source", "target", "components")):
             Fs = getattr(obj.source, "source", None)
-            blocks: List[str] = ["# Natural Transformation"]
+            blocks: list[str] = ["# Natural Transformation"]
             if Fs is not None and hasattr(Fs, "arrows"):
                 morphs = sorted(Fs.arrows, key=lambda a: _arr_name(a))
                 cap = naturality_sample_limit or len(morphs)
@@ -365,7 +365,7 @@ __all__ = [
     "category_mermaid",
     "diagram_mermaid",
     "functor_mermaid",
-    "naturality_mermaid", 
+    "naturality_mermaid",
     "plan_mermaid",
     "structured_plan_mermaid",
     "exec_gantt_mermaid",

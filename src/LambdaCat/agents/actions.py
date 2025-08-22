@@ -1,6 +1,6 @@
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Callable, Final, Generic, Mapping, Tuple, TypeVar, Union
-from ..core.presentation import Formal1
+from typing import Any, Callable, Final, Generic, TypeVar, Union
 
 
 def action(name: str) -> str:
@@ -23,17 +23,17 @@ class Task(Generic[State, Ctx]):
 
 @dataclass(frozen=True)
 class Sequence(Generic[State, Ctx]):
-    items: Tuple["Plan[State, Ctx]", ...]
+    items: tuple["Plan[State, Ctx]", ...]
 
 
 @dataclass(frozen=True)
 class Parallel(Generic[State, Ctx]):
-    items: Tuple["Plan[State, Ctx]", ...]
+    items: tuple["Plan[State, Ctx]", ...]
 
 
 @dataclass(frozen=True)
 class Choose(Generic[State, Ctx]):
-    items: Tuple["Plan[State, Ctx]", ...]
+    items: tuple["Plan[State, Ctx]", ...]
 
 
 @dataclass(frozen=True)
@@ -69,7 +69,10 @@ def task(name: str) -> Plan[State, Ctx]:
 
 
 def _as_plan(item: Union[Plan[State, Ctx], str]) -> Plan[State, Ctx]:
-    return item if isinstance(item, (Task, Sequence, Parallel, Choose, Focus, LoopWhile)) else Task(str(item))
+    return (
+        item if isinstance(item, (Task, Sequence, Parallel, Choose, Focus, LoopWhile))
+        else Task(str(item))
+    )
 
 
 
@@ -91,8 +94,8 @@ def lens(get: Callable[[State], Sub], set: Callable[[State, Sub], State]) -> Len
     return Lens(get=get, set=set)
 
 
-def focus(l: Lens[State, Sub], inner: Plan[Sub, Ctx]) -> Plan[State, Ctx]:
-    return Focus(lens=l, inner=inner)
+def focus(lens: Lens[State, Sub], inner: Plan[Sub, Ctx]) -> Plan[State, Ctx]:
+    return Focus(lens=lens, inner=inner)
 
 
 def loop_while(predicate: Callable[[State], bool], body: Plan[State, Ctx]) -> Plan[State, Ctx]:
@@ -143,7 +146,9 @@ class Actions(Generic[State, Ctx]):
             if name_or_fn not in self._name_to_fn:
                 try:
                     from difflib import get_close_matches
-                    matches = get_close_matches(name_or_fn, list(self._name_to_fn.keys()), n=3, cutoff=0.6)
+                    matches = get_close_matches(
+                        name_or_fn, list(self._name_to_fn.keys()), n=3, cutoff=0.6
+                    )
                 except Exception:
                     matches = []
                 hint = f" Did you mean: {', '.join(matches)}" if matches else ""
@@ -154,27 +159,29 @@ class Actions(Generic[State, Ctx]):
         return task(name)
 
     def sequence(self, *items: Union[Plan[State, Ctx], str, Fn]) -> Plan[State, Ctx]:
-        normalized: Tuple[Plan[State, Ctx], ...] = tuple(
+        normalized: tuple[Plan[State, Ctx], ...] = tuple(
             self._normalize_item(i) for i in items
         )
         return sequence(*normalized)
 
     def parallel(self, *items: Union[Plan[State, Ctx], str, Fn]) -> Plan[State, Ctx]:
-        normalized: Tuple[Plan[State, Ctx], ...] = tuple(
+        normalized: tuple[Plan[State, Ctx], ...] = tuple(
             self._normalize_item(i) for i in items
         )
         return parallel(*normalized)
 
     def choose(self, *items: Union[Plan[State, Ctx], str, Fn]) -> Plan[State, Ctx]:
-        normalized: Tuple[Plan[State, Ctx], ...] = tuple(
+        normalized: tuple[Plan[State, Ctx], ...] = tuple(
             self._normalize_item(i) for i in items
         )
         return choose(*normalized)
 
-    def focus(self, l: Lens[State, Any], inner: Plan[Any, Ctx]) -> Plan[State, Ctx]:
-        return focus(l, inner)
+    def focus(self, lens: Lens[State, Any], inner: Plan[Any, Ctx]) -> Plan[State, Ctx]:
+        return focus(lens, inner)
 
-    def loop_while(self, predicate: Callable[[State], bool], body: Plan[State, Ctx]) -> Plan[State, Ctx]:
+    def loop_while(
+        self, predicate: Callable[[State], bool], body: Plan[State, Ctx]
+    ) -> Plan[State, Ctx]:
         return loop_while(predicate, body)
 
     # --------------------------------- Utilities ---------------------------------

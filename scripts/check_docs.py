@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import argparse
 import re
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
-
 
 CODE_BLOCK_RE = re.compile(r"```python\n(.*?)\n```", re.DOTALL)
 

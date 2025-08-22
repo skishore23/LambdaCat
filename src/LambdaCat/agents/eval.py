@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, Generic, Iterable, List, Mapping, Sequence, Tuple, TypeVar
+from typing import Any, Callable, Generic, TypeVar
 
-from .actions import Plan
-from .runtime import call_action, compile_plan
-from .runtime import Action
 from ..core.presentation import Formal1
-
+from .actions import Plan
+from .runtime import Action, call_action, compile_plan
 
 State = TypeVar("State")
 Ctx = TypeVar("Ctx")
@@ -45,7 +44,7 @@ def run_plan(
     snapshot: bool = False,
 ) -> RunReport[State]:
     value = input_value
-    traces: List[StepTrace[State]] = []
+    traces: list[StepTrace[State]] = []
     for step in plan.factors:
         fn = implementation[step]
         before = value if snapshot else None
@@ -71,12 +70,12 @@ def run_structured_plan(
     input_value: State,
     *,
     ctx: Ctx | None = None,
-    choose_fn: Callable[[List[State]], int] | None = None,
-    aggregate_fn: Callable[[List[State]], State] | None = None,
+    choose_fn: Callable[[list[State]], int] | None = None,
+    aggregate_fn: Callable[[list[State]], State] | None = None,
     snapshot: bool = False,
 ) -> RunReport[State]:
     # Per-task tracing by wrapping actions
-    traces: List[StepTrace[State]] = []
+    traces: list[StepTrace[State]] = []
 
     def _wrap(name: str, fn: Callable[..., State]) -> Action[State, Ctx]:
         def wrapped(x: State, c: Ctx | None = None) -> State:
@@ -109,8 +108,8 @@ def choose_best(
     ctx: Ctx | None = None,
     evaluator: Callable[[State], Score],
     snapshot: bool = False,
-) -> Tuple[Formal1, RunReport[State]]:
-    best: Tuple[Formal1, RunReport[State]] | None = None
+) -> tuple[Formal1, RunReport[State]]:
+    best: tuple[Formal1, RunReport[State]] | None = None
     for plan in candidates:
         report = run_plan(plan, implementation, input_value, ctx=ctx, evaluator=evaluator, snapshot=snapshot)
         if best is None or (report.score is not None and report.score > best[1].score):
@@ -160,7 +159,7 @@ class Agent(Generic[State, Ctx]):
         input_value: State,
         *,
         ctx: Ctx | None = None,
-    ) -> Tuple[Formal1, RunReport[State]]:
+    ) -> tuple[Formal1, RunReport[State]]:
         if self.evaluator is None:
             raise AssertionError("Agent.choose_best requires an evaluator")
         return choose_best(candidates, self.implementation, input_value, ctx=ctx, evaluator=self.evaluator, snapshot=self.snapshot)
@@ -175,12 +174,12 @@ class Agent(Generic[State, Ctx]):
 
     def run_structured(
         self,
-        plan: "Plan[State, Ctx]",
+        plan: Plan[State, Ctx],
         input_value: State,
         *,
         ctx: Ctx | None = None,
-        choose_fn: Callable[[List[State]], int] | None = None,
-        aggregate_fn: Callable[[List[State]], State] | None = None,
+        choose_fn: Callable[[list[State]], int] | None = None,
+        aggregate_fn: Callable[[list[State]], State] | None = None,
         snapshot: bool | None = None,
     ) -> RunReport[State]:
         snap = self.snapshot if snapshot is None else snapshot
@@ -204,11 +203,11 @@ class AgentBuilder(Generic[State, Ctx]):
         self._evaluator: Callable[[State], Score] | None = None
         self._snapshot: bool = False
 
-    def with_evaluator(self, evaluator: Callable[[State], Score]) -> "AgentBuilder[State, Ctx]":
+    def with_evaluator(self, evaluator: Callable[[State], Score]) -> AgentBuilder[State, Ctx]:
         self._evaluator = evaluator
         return self
 
-    def with_snapshot(self, snapshot: bool) -> "AgentBuilder[State, Ctx]":
+    def with_snapshot(self, snapshot: bool) -> AgentBuilder[State, Ctx]:
         self._snapshot = snapshot
         return self
 
@@ -223,6 +222,6 @@ class AgentBuilder(Generic[State, Ctx]):
                 if len(params) not in (1, 2):
                     raise TypeError
             except Exception:
-                raise TypeError(f"Action '{name}' must accept 1 or 2 parameters (x) or (x, ctx)")
+                raise TypeError(f"Action '{name}' must accept 1 or 2 parameters (x) or (x, ctx)") from None
         return Agent(self._implementation, evaluator=self._evaluator, snapshot=self._snapshot)
 

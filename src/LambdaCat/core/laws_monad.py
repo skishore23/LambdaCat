@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Callable, List, Sequence, TypeVar, cast
+from typing import TypeVar, cast
 
-from .laws import Law, LawResult, Violation, LawSuite, ConfigDict, WitnessDict, SupportsEq
 from .fp.typeclasses import MonadT
+from .laws import ConfigDict, Law, LawResult, LawSuite, SupportsEq, Violation, WitnessDict
 
 A = TypeVar("A")
 B = TypeVar("B")
@@ -18,8 +19,8 @@ class _MonadLeftIdentityLaw(Law[MonadT]):
     tags: Sequence[str] = ("monad", "core")
 
     def run(self, monad: MonadT, config: ConfigDict) -> LawResult[MonadT]:
-        violations: List[Violation[MonadT]] = []
-        
+        violations: list[Violation[MonadT]] = []
+
         # Test left identity law: return a >>= f = f a
         try:
             test_value = config.get("test_value")
@@ -27,14 +28,15 @@ class _MonadLeftIdentityLaw(Law[MonadT]):
                 return LawResult(self.name, passed=False, violations=[
                     Violation(self.name, "No test_value provided in config", cast(WitnessDict, {"monad": str(monad)}))
                 ])
-            
+
             # Define test function
-            f = lambda x: type(monad).pure(x + 1)
-            
+            def f(x):
+                return type(monad).pure(x + 1)
+
             # Test both sides
             left = type(monad).pure(test_value).bind(f)
             right = f(test_value)
-            
+
             # Check equality using protocol
             if isinstance(left, SupportsEq) and isinstance(right, SupportsEq):
                 if left != right:
@@ -49,7 +51,7 @@ class _MonadLeftIdentityLaw(Law[MonadT]):
                 f"Error testing left identity law: {e}",
                 cast(WitnessDict, {"monad": str(monad), "error": str(e)})
             ))
-        
+
         return LawResult(self.name, passed=(len(violations) == 0), violations=violations)
 
 
@@ -59,8 +61,8 @@ class _MonadRightIdentityLaw(Law[MonadT]):
     tags: Sequence[str] = ("monad", "core")
 
     def run(self, monad: MonadT, config: ConfigDict) -> LawResult[MonadT]:
-        violations: List[Violation[MonadT]] = []
-        
+        violations: list[Violation[MonadT]] = []
+
         # Test right identity law: m >>= return = m
         try:
             test_value = config.get("test_value")
@@ -68,11 +70,11 @@ class _MonadRightIdentityLaw(Law[MonadT]):
                 return LawResult(self.name, passed=False, violations=[
                     Violation(self.name, "No test_value provided in config", cast(WitnessDict, {"monad": str(monad)}))
                 ])
-            
+
             # Test both sides
             left = monad.bind(type(monad).pure)
             right = monad
-            
+
             # Check equality using protocol
             if isinstance(left, SupportsEq) and isinstance(right, SupportsEq):
                 if left != right:
@@ -87,7 +89,7 @@ class _MonadRightIdentityLaw(Law[MonadT]):
                 f"Error testing right identity law: {e}",
                 cast(WitnessDict, {"monad": str(monad), "error": str(e)})
             ))
-        
+
         return LawResult(self.name, passed=(len(violations) == 0), violations=violations)
 
 
@@ -97,8 +99,8 @@ class _MonadAssociativityLaw(Law[MonadT]):
     tags: Sequence[str] = ("monad", "core")
 
     def run(self, monad: MonadT, config: ConfigDict) -> LawResult[MonadT]:
-        violations: List[Violation[MonadT]] = []
-        
+        violations: list[Violation[MonadT]] = []
+
         # Test associativity law: (m >>= f) >>= g = m >>= (\x -> f x >>= g)
         try:
             test_value = config.get("test_value")
@@ -106,15 +108,17 @@ class _MonadAssociativityLaw(Law[MonadT]):
                 return LawResult(self.name, passed=False, violations=[
                     Violation(self.name, "No test_value provided in config", cast(WitnessDict, {"monad": str(monad)}))
                 ])
-            
+
             # Define test functions
-            f = lambda x: type(monad).pure(x + 1)
-            g = lambda x: type(monad).pure(x * 2)
-            
+            def f(x):
+                return type(monad).pure(x + 1)
+            def g(x):
+                return type(monad).pure(x * 2)
+
             # Test both sides
             left = monad.bind(f).bind(g)
             right = monad.bind(lambda x: f(x).bind(g))
-            
+
             # Check equality using protocol
             if isinstance(left, SupportsEq) and isinstance(right, SupportsEq):
                 if left != right:
@@ -129,7 +133,7 @@ class _MonadAssociativityLaw(Law[MonadT]):
                 f"Error testing associativity law: {e}",
                 cast(WitnessDict, {"monad": str(monad), "error": str(e)})
             ))
-        
+
         return LawResult(self.name, passed=(len(violations) == 0), violations=violations)
 
 

@@ -27,10 +27,7 @@ print("=" * 50)
 print("\n1️⃣ LIMITS IN FINITE CATEGORIES")
 print("-" * 30)
 
-from LambdaCat.core import (
-    product, equalizer, terminal_object, initial_object,
-    obj, arrow, build_presentation, Cat
-)
+from LambdaCat.core import Cat, arrow, build_presentation, equalizer, obj, product, terminal_object
 from LambdaCat.core.standard import discrete, terminal_category
 
 # Terminal objects
@@ -48,10 +45,10 @@ print("\n📦 Products:")
 prod_AA = product(D, "A", "A")
 print(f"   Product A×A in discrete category: {prod_AA.cone.apex if prod_AA else 'None'}")
 
-prod_AB = product(D, "A", "B") 
+prod_AB = product(D, "A", "B")
 print(f"   Product A×B in discrete category: {prod_AB.cone.apex if prod_AB else 'None'}")
 
-# Equalizers  
+# Equalizers
 print("\n⚖️ Equalizers:")
 A, B = obj("A"), obj("B")
 f = arrow("f", "A", "B")
@@ -73,9 +70,7 @@ print(f"   Equalizer of f and g: {eq_different.cone.apex if eq_different else 'N
 print("\n2️⃣ ADJUNCTIONS")
 print("-" * 15)
 
-from LambdaCat.core import (
-    Adjunction, ADJUNCTION_SUITE, free_forgetful_adjunction, run_suite
-)
+from LambdaCat.core import ADJUNCTION_SUITE, free_forgetful_adjunction, run_suite
 
 print("🔗 Free-Forgetful Adjunction:")
 adj = free_forgetful_adjunction()
@@ -90,7 +85,7 @@ print(f"   Overall result: {'✅ PASS' if report.ok else '❌ FAIL'}")
 for result in report.results:
     status = '✅ PASS' if result.passed else '❌ FAIL'
     print(f"   {result.law}: {status} ({len(result.violations)} violations)")
-    
+
     # Show first violation if any
     if result.violations:
         print(f"      └─ {result.violations[0].message}")
@@ -102,10 +97,7 @@ for result in report.results:
 print("\n3️⃣ KLEISLI CATEGORY BUILDER")
 print("-" * 28)
 
-from LambdaCat.core.fp import (
-    kleisli_category_for, get_registered_monads, 
-    register_monad, KleisliCat, Kleisli
-)
+from LambdaCat.core.fp import Kleisli, get_registered_monads, kleisli_category_for
 from LambdaCat.core.fp.instances.option import Option
 from LambdaCat.core.fp.instances.result import Result
 

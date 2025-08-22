@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Tuple, TypedDict, List
+from typing import TypedDict
 
-from .presentation import Obj, ArrowGen, Formal1, Presentation
+from .presentation import ArrowGen, Obj, Presentation
 
 
 class ArrowDict(TypedDict):
@@ -13,28 +13,28 @@ class ArrowDict(TypedDict):
 
 
 class CategoryJSON(TypedDict):
-	objects: List[str]
-	arrows: List[ArrowDict]
-	composition: Dict[str, str]
-	identities: Dict[str, str]
+	objects: list[str]
+	arrows: list[ArrowDict]
+	composition: dict[str, str]
+	identities: dict[str, str]
 
 
 @dataclass(frozen=True)
 class Cat:
-	objects: Tuple[Obj, ...]
-	arrows: Tuple[ArrowGen, ...]
-	composition: Dict[Tuple[str, str], str]
-	identities: Dict[str, str]
+	objects: tuple[Obj, ...]
+	arrows: tuple[ArrowGen, ...]
+	composition: dict[tuple[str, str], str]
+	identities: dict[str, str]
 
 	def __repr__(self) -> str:  # pragma: no cover
 		return f"Cat(|Obj|={len(self.objects)}, |Arr|={len(self.arrows)})"
 
 	@staticmethod
-	def from_presentation(p: Presentation) -> "Cat":
+	def from_presentation(p: Presentation) -> Cat:
 		ids = {o.name: f"id:{o.name}" for o in p.objects}
 		# Seed composition with identity laws for all arrows present in presentation
-		comp: Dict[Tuple[str, str], str] = {}
-		by_obj_id: Dict[str, str] = ids
+		comp: dict[tuple[str, str], str] = {}
+		by_obj_id: dict[str, str] = ids
 		for a in p.arrows:
 			id_src = by_obj_id.get(a.source)
 			id_tgt = by_obj_id.get(a.target)
@@ -66,7 +66,7 @@ class Cat:
 		except KeyError as e:
 			raise KeyError(f"no identity for object {obj_name}") from e
 
-	def op(self) -> "Cat":
+	def op(self) -> Cat:
 		# Deferred import to avoid cycles
 		from .ops_category import opposite_category
 		return opposite_category(self)
@@ -81,24 +81,24 @@ class Cat:
 		)
 
 	@classmethod
-	def from_json(cls, data: CategoryJSON) -> "Cat":
+	def from_json(cls, data: CategoryJSON) -> Cat:
 		"""Create category from JSON data."""
-		from .presentation import Obj, ArrowGen
-		
+		from .presentation import ArrowGen, Obj
+
 		objects = tuple(Obj(name) for name in data["objects"])
 		arrows = tuple(ArrowGen(arr["name"], arr["source"], arr["target"]) for arr in data["arrows"])
-		
+
 		# Parse composition table
 		composition = {}
 		for key, value in data["composition"].items():
 			f, g = key.split(",", 1)
 			composition[(f, g)] = value
-		
+
 		identities = data["identities"]
-		
+
 		return cls(objects, arrows, composition, identities)
 
-	def slice(self, A: str) -> "Cat":
+	def slice(self, A: str) -> Cat:
 		"""Create slice category C/A."""
 		from .ops_category import slice_category
 		return slice_category(self, A)

@@ -1,24 +1,24 @@
-from .presentation import Obj, ArrowGen, Formal1, Presentation
+from .adjunctions import ADJUNCTION_SUITE, Adjunction, free_forgetful_adjunction
+from .builder import arrow, build_presentation, obj
 from .category import Cat
-from .builder import obj, arrow, build_presentation
-from .functor import Functor, apply_functor, FunctorBuilder
-from .natural import Natural, check_naturality
-from .laws import Law, LawSuite, Violation, LawResult, SuiteReport, run_suite
-from .laws_category import CATEGORY_SUITE
-from .laws_natural import NATURAL_SUITE
-from .laws_functor import FUNCTOR_SUITE
-from .laws_applicative import APPLICATIVE_SUITE
-from .laws_monad import MONAD_SUITE
 from .diagram import Diagram
-from .optics import Lens, Prism, Iso, lens, prism, iso, view, set_value, focus, preview, review
-from .limits import Cone, Limit, product, equalizer, terminal_object, initial_object
-from .adjunctions import Adjunction, ADJUNCTION_SUITE, free_forgetful_adjunction
-from .fp.typeclasses import FunctorT, ApplicativeT, MonadT, Semigroup, Monoid
+from .fp.typeclasses import ApplicativeT, FunctorT, MonadT, Monoid, Semigroup
+from .functor import Functor, FunctorBuilder, apply_functor
+from .laws import Law, LawResult, LawSuite, SuiteReport, Violation, run_suite
+from .laws_applicative import APPLICATIVE_SUITE
+from .laws_category import CATEGORY_SUITE
+from .laws_functor import FUNCTOR_SUITE
+from .laws_monad import MONAD_SUITE
+from .laws_natural import NATURAL_SUITE
+from .limits import Cone, Limit, equalizer, initial_object, product, terminal_object
+from .natural import Natural, check_naturality
+from .optics import Iso, Lens, Prism, focus, iso, lens, preview, prism, review, set_value, view
+from .presentation import ArrowGen, Formal1, Obj, Presentation
 
 __all__ = [
 	# Core types
 	"Obj",
-	"ArrowGen", 
+	"ArrowGen",
 	"Formal1",
 	"Presentation",
 	"Cat",
@@ -36,7 +36,7 @@ __all__ = [
 	"Law",
 	"LawSuite",
 	"Violation",
-	"LawResult", 
+	"LawResult",
 	"SuiteReport",
 	"run_suite",
 	"CATEGORY_SUITE",
@@ -48,7 +48,7 @@ __all__ = [
 	"Diagram",
 	# Optics
 	"Lens",
-	"Prism", 
+	"Prism",
 	"Iso",
 	"lens",
 	"prism",
@@ -60,7 +60,7 @@ __all__ = [
 	"review",
 	# Typeclasses
 		"FunctorT",
-	"ApplicativeT", 
+	"ApplicativeT",
 	"MonadT",
 	"Semigroup",
 	"Monoid",

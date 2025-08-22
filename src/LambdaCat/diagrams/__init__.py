@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from LambdaCat.core.diagram import Diagram
 from LambdaCat.render.mermaid import diagram_mermaid
+
 try:
     from LambdaCat.render.graphviz import diagram_dot
     _HAS_GRAPHVIZ = True

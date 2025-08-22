@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -18,12 +18,12 @@ class ArrowGen:
 @dataclass(frozen=True)
 class Formal1:
 	# h∘...∘g∘f (rightmost applied first)
-	factors: Tuple[str, ...]
+	factors: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class Presentation:
-	objects: Tuple[Obj, ...]
-	arrows: Tuple[ArrowGen, ...]
-	relations: Tuple[Tuple[Formal1, Formal1], ...] = ()
+	objects: tuple[Obj, ...]
+	arrows: tuple[ArrowGen, ...]
+	relations: tuple[tuple[Formal1, Formal1], ...] = ()
 
