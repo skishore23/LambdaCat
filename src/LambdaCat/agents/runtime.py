@@ -30,11 +30,11 @@ def _call_action_generic(fn: Callable[..., TState], x: TState, ctx: Ctx | None) 
 def sequential_functor(
     implementation: Mapping[str, Action[State, Ctx]],
     mode: str = "sequential",
-):
+) -> Callable[[Formal1], Callable[[State, Ctx | None], State]]:
     if mode != "sequential":
         raise ValueError("Only sequential mode is supported")
 
-    def F(plan: Formal1):
+    def F(plan: Formal1) -> Callable[[State, Ctx | None], State]:
         def run(x: State, ctx: Ctx | None = None) -> State:
             value = x
             for step in plan.factors:
@@ -49,9 +49,9 @@ def sequential_functor(
 def compile_to_kleisli(
     implementation: Mapping[str, Action[State, Ctx]],
     plan: Plan[State, Ctx],
-    monad_cls: type[MonadT],
+    monad_cls: type[MonadT[object]],
     mode: str = "monadic"
-) -> Kleisli[MonadT, State, State]:
+) -> Kleisli[MonadT[object], State, State]:
     """Compile a plan to a Kleisli arrow for the given monad.
     
     Note: Complex plans with parallel and choose operations may not work correctly
@@ -60,11 +60,11 @@ def compile_to_kleisli(
     if mode not in ("monadic", "applicative"):
         raise ValueError("mode must be 'monadic' or 'applicative'")
     
-    def compile_rec(p: Plan[State, Ctx]) -> Kleisli[MonadT, State, State]:
+    def compile_rec(p: Plan[State, Ctx]) -> Kleisli[MonadT[object], State, State]:
         if isinstance(p, Task):
             # Convert action to Kleisli
             action = implementation[p.name]
-            return Kleisli(lambda s: monad_cls.pure(action(s)))
+            return Kleisli(lambda s: monad_cls.pure(action(s)))  # type: ignore[arg-type,return-value]
         
         elif isinstance(p, SeqNode):
             # Sequential composition
@@ -94,12 +94,12 @@ def compile_to_kleisli(
         elif isinstance(p, Focus):
             # Focus on a sub-state
             inner = compile_rec(p.inner)
-            return Kleisli(lambda s: 
+            return Kleisli(lambda s:  # type: ignore[arg-type,return-value]
                 monad_cls.pure(p.lens.set(inner(p.lens.get(s)), s)))
         
         elif isinstance(p, LoopWhile):
             # Loop while predicate is true
-            def loop_run(s: State) -> monad_cls[State]:
+            def loop_run(s: State) -> MonadT[object]:  # type: ignore[valid-type]
                 current = s
                 while p.predicate(current):
                     result = compile_rec(p.body)(current)
@@ -108,7 +108,7 @@ def compile_to_kleisli(
                         current = result.get_or_else(current) if hasattr(result, 'get_or_else') else current
                     else:
                         current = result
-                return monad_cls.pure(current)
+                return monad_cls.pure(current)  # type: ignore[assignment]
             
             return Kleisli(loop_run)
         
@@ -124,8 +124,8 @@ def call_action(fn: Callable[..., TState], x: TState, ctx: Ctx | None) -> TState
 
 
 # Structured plan interpreter (Seq / Par / Choose / Focus / LoopWhile)
-ChooseFn = Callable[[List[State]], int]
-AggregateFn = Callable[[List[State]], State]
+ChooseFn = Callable[[List[object]], int]
+AggregateFn = Callable[[List[object]], object]
 
 
 # -------------------------- Helpers for Par/Choose --------------------------
@@ -133,7 +133,6 @@ AggregateFn = Callable[[List[State]], State]
 
 def concat(sep: str = "") -> Callable[[List[str]], str]:
     def _agg(outputs: List[str]) -> str:
-        # Fail-fast: ensure homogeneous, string-like types; otherwise raise
         if not outputs:
             return "" if sep == "" else sep.join([])
         return sep.join(outputs)
@@ -164,7 +163,7 @@ def _compile_plan(
     *,
     choose_fn: ChooseFn | None,
     aggregate_fn: AggregateFn | None,
-):
+) -> Callable[[State, Ctx | None], State]:
     if isinstance(plan, Task):
         fn = implementation[plan.name]
 
@@ -191,7 +190,7 @@ def _compile_plan(
             if not aggregate_fn:
                 raise ValueError("Parallel execution requires aggregate_fn")
             outputs = [item(x, ctx) for item in items]
-            return aggregate_fn(outputs)
+            return aggregate_fn(outputs)  # type: ignore[no-any-return]
 
         return run_par
 

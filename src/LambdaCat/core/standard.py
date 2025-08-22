@@ -18,7 +18,7 @@ def terminal_category(name: str = "Terminal") -> Cat:
     arrows = (ArrowGen(id_name, obj.name, obj.name),)
     composition = MappingProxyType({(id_name, id_name): id_name})
     identities = MappingProxyType({obj.name: id_name})
-    return Cat(objects=(obj,), arrows=arrows, composition=composition, identities=identities)
+    return Cat(objects=(obj,), arrows=arrows, composition=dict(composition), identities=dict(identities))
 
 
 def discrete(objects: list[str], name: str = "Discrete") -> Cat:
@@ -32,7 +32,7 @@ def discrete(objects: list[str], name: str = "Discrete") -> Cat:
     arrows = tuple(ArrowGen(ids[o.name], o.name, o.name) for o in objs)
     composition = MappingProxyType({(i, i): i for i in ids.values()})
     identities = MappingProxyType(ids)
-    return Cat(objects=objs, arrows=arrows, composition=composition, identities=identities)
+    return Cat(objects=objs, arrows=arrows, composition=dict(composition), identities=dict(identities))
 
 
 def simplex(n: int, name: str | None = None) -> Cat:
@@ -63,7 +63,7 @@ def simplex(n: int, name: str | None = None) -> Cat:
         for i in range(n + 1) for j in range(i, n + 1) for k in range(j, n + 1)
     })
     identities = MappingProxyType(ids)
-    return Cat(objects=objs, arrows=arrows, composition=composition, identities=identities)
+    return Cat(objects=objs, arrows=arrows, composition=dict(composition), identities=dict(identities))
 
 
 def walking_isomorphism(name: str = "Iso") -> Cat:
@@ -92,7 +92,7 @@ def walking_isomorphism(name: str = "Iso") -> Cat:
         (f, g): idB,
     })
     identities = MappingProxyType({A.name: idA, B.name: idB})
-    return Cat(objects=(A, B), arrows=arrows, composition=composition, identities=identities)
+    return Cat(objects=(A, B), arrows=arrows, composition=dict(composition), identities=dict(identities))
 
 
 def monoid_category(elements: Iterable[str], op: Dict[tuple[str, str], str], unit: str) -> Cat:
@@ -119,7 +119,7 @@ def monoid_category(elements: Iterable[str], op: Dict[tuple[str, str], str], uni
     # Identity is the unit
     identities = MappingProxyType({"*": unit})
     
-    return Cat(objects=objs, arrows=arrows, composition=composition, identities=identities)
+    return Cat(objects=objs, arrows=arrows, composition=dict(composition), identities=dict(identities))
 
 
 def poset_category(P: Iterable[str], leq: Dict[tuple[str, str], bool]) -> Cat:
@@ -155,7 +155,7 @@ def poset_category(P: Iterable[str], leq: Dict[tuple[str, str], bool]) -> Cat:
                     comp[(left, right)] = f"{x.name}->{z.name}" if x.name != z.name else f"id:{x.name}"
     composition = MappingProxyType(comp)
     identities = MappingProxyType(ids)
-    return Cat(objects=objs, arrows=arrows, composition=composition, identities=identities)
+    return Cat(objects=objs, arrows=arrows, composition=dict(composition), identities=dict(identities))
 
 
 def discrete_category(X: Iterable[str]) -> Cat:

@@ -1,7 +1,7 @@
 """Limits and colimits in finite categories.
 
 This module implements basic limits (products, equalizers) for small finite categories.
-Following the fail-fast principle, operations fail explicitly when limits don't exist.
+Operations fail explicitly when limits don't exist.
 """
 
 from __future__ import annotations

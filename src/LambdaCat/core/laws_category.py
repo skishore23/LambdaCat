@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Sequence
 
 from .category import Cat
-from .laws import Law, LawResult, Violation, LawSuite
+from .laws import Law, LawResult, Violation, LawSuite, ConfigDict
 
 
 def _composable(C: Cat, f: str, g: str) -> bool:
@@ -17,7 +17,7 @@ class _IdentitiesLaw(Law[Cat]):
 	name: str = "identities"
 	tags: Sequence[str] = ("category", "core")
 
-	def run(self, C: Cat, config: Dict[str, object]) -> LawResult[Cat]:
+	def run(self, C: Cat, config: ConfigDict) -> LawResult[Cat]:
 		violations: List[Violation[Cat]] = []
 		for obj_name, id_name in C.identities.items():
 			# right and left identity for any morphism incident to obj
@@ -36,8 +36,9 @@ class _AssociativityLaw(Law[Cat]):
 	name: str = "associativity"
 	tags: Sequence[str] = ("category", "core")
 
-	def run(self, C: Cat, config: Dict[str, object]) -> LawResult[Cat]:
-		limit = int(config.get("assoc_sample_limit", 0))  # 0 = exhaustive
+	def run(self, C: Cat, config: ConfigDict) -> LawResult[Cat]:
+		limit_val = config.get("assoc_sample_limit", 0)
+		limit = int(limit_val) if isinstance(limit_val, (int, str)) else 0  # 0 = exhaustive
 		count = 0
 		violations: List[Violation[Cat]] = []
 		pairs = list(C.composition.keys())
@@ -68,7 +69,7 @@ class _WellTypedComposition(Law[Cat]):
 	name: str = "well-typed-composition"
 	tags: Sequence[str] = ("category", "core")
 
-	def run(self, C: Cat, config: Dict[str, object]) -> LawResult[Cat]:
+	def run(self, C: Cat, config: ConfigDict) -> LawResult[Cat]:
 		violations: List[Violation[Cat]] = []
 		# If cod(f)==dom(g), then (g,f) must appear in composition table and with correct typing
 		# Build lookup for arrows by name

@@ -141,7 +141,6 @@ class Actions(Generic[State, Ctx]):
     def task(self, name_or_fn: Union[str, Fn]) -> Plan[State, Ctx]:
         if isinstance(name_or_fn, str):
             if name_or_fn not in self._name_to_fn:
-                # Suggest close matches (fail-fast; no fallback)
                 try:
                     from difflib import get_close_matches
                     matches = get_close_matches(name_or_fn, list(self._name_to_fn.keys()), n=3, cutoff=0.6)

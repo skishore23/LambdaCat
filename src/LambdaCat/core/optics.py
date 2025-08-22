@@ -5,6 +5,8 @@ from typing import Callable, Generic, TypeVar
 
 A = TypeVar("A")
 B = TypeVar("B")
+C = TypeVar("C")
+D = TypeVar("D")
 S = TypeVar("S")
 T = TypeVar("T")
 
@@ -44,7 +46,7 @@ class Prism(Generic[S, T, A, B]):
         def modify_fn(s: S) -> T:
             a = self.preview(s)
             if a is None:
-                return s  # type: ignore
+                return s
             return self.review(f(a))
         return modify_fn
     

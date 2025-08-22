@@ -23,7 +23,7 @@ def opposite_category(C: Cat) -> Cat:
     arrows = tuple(
         type(C.arrows[0])(to_op[a.name], a.target, a.source) for a in C.arrows
     )
-    return Cat(objects=C.objects, arrows=arrows, composition=comp, identities=ids)
+    return Cat(objects=C.objects, arrows=arrows, composition=dict(comp), identities=dict(ids))
 
 
 
@@ -206,5 +206,5 @@ def slice_category(C: Cat, A: str) -> Cat:
         arrows = tuple(ArrowGen(n, s, t) for (n, s, t) in arrows_list)
     else:
         arrows = ()
-    return Cat(objects=objs, arrows=arrows, composition=composition, identities=identities)
+    return Cat(objects=objs, arrows=arrows, composition=dict(composition), identities=dict(identities))
 

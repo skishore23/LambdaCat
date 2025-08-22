@@ -219,7 +219,6 @@ print("""
 ✅ LIMITS & COLIMITS:
    • Terminal/initial objects in finite categories
    • Products and equalizers with universality checking
-   • Fail-fast validation for malformed inputs
 
 ✅ ADJUNCTIONS:
    • Complete adjunction framework with unit/counit
@@ -235,12 +234,6 @@ print("""
    • Validation pipelines with error handling
    • Computation chains with effects
    • Mathematical modeling and research
-
-All features maintain LambdaCat's core principles:
-• Fail-fast (no silent fallbacks)
-• Strong typing (mypy --strict)
-• Functional design (immutable, composable)
-• Law verification (mathematical correctness)
 """)
 
 print("🚀 LambdaCat: Complete category theory toolkit for Python!")

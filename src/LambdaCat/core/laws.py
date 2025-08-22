@@ -6,7 +6,7 @@ from typing import Dict, Generic, Iterable, List, Optional, Protocol, Sequence, 
 T = TypeVar("T")
 
 # Type aliases for better type safety
-WitnessValue = Union[str, int, float, bool, None, "T"]
+WitnessValue = Union[str, int, float, bool, None, T]
 WitnessDict = Dict[str, WitnessValue]
 ConfigValue = Union[str, int, float, bool, None, List["ConfigValue"], Dict[str, "ConfigValue"]]
 ConfigDict = Dict[str, ConfigValue]

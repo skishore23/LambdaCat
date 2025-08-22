@@ -13,7 +13,7 @@
 - 🧠 **Functional Programming**: Functor, Applicative, Monad typeclasses with concrete instances
 - 🤖 **Agent Framework**: Composable plan DSL with `sequence`, `parallel`, `choose`, `focus`, and `loop_while`
 - 📊 **Diagram Rendering**: Mermaid and Graphviz DOT formats for categories and plans
-- 🎯 **Strong Typing**: Full mypy support with strict typing throughout
+- 🎯 **Type Safety**: mypy support with typing for core functionality
 - 🚀 **Advanced Features**: Limits/colimits, adjunctions, and Kleisli category builder
 
 ---
@@ -183,7 +183,7 @@ ruff check .
 ✅ **FP Typeclasses**: Functor, Applicative, Monad with concrete instances  
 ✅ **Agent Framework**: Plan DSL with compilation and execution  
 ✅ **Diagram Rendering**: Mermaid and DOT formats  
-✅ **Strong Typing**: Full mypy compliance  
+✅ **Type Safety**: mypy support for core functionality  
 ✅ **Advanced Features**: Limits, adjunctions, Kleisli categories
 
 ---

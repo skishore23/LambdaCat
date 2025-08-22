@@ -48,7 +48,6 @@ class MonadT(ApplicativeT[A], ABC, Generic[A]):
 def fmap(m: MonadT[A], f: Callable[[A], B]) -> MonadT[B]:
 	"""Map a pure function over a monadic value using bind/pure.
 
-	Fail-fast if the instance does not satisfy the required interface at runtime.
 	This helper is defined in terms of `bind` and `pure` to emphasize minimal
 	requirements.
 	"""

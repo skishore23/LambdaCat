@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Mapping, Tuple
+from typing import Callable, Dict, Mapping, Tuple
 
 from .presentation import Formal1
 from .category import Cat
@@ -33,7 +33,7 @@ class CatFunctor:
 	morphism_map: Mapping[str, str]
 
 	# FunctorT instance (map on morphism names as values)
-	def map(self, f: callable) -> "CatFunctor":  # type: ignore[override]
+	def map(self, f: Callable[[object], object]) -> "CatFunctor":
 		# No-op map since CatFunctor is not a value container; provided for law harness compatibility
 		return self
 

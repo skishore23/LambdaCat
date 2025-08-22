@@ -11,7 +11,7 @@ B = TypeVar("B")
 
 @dataclass(frozen=True)
 class Option(Generic[A]):
-    """Option monad with fail-fast semantics."""
+    """Option monad."""
     
     _value: A | None
     

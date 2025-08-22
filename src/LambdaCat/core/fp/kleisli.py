@@ -21,7 +21,7 @@ class Kleisli(Generic[M, A, B]):
     
     def compose(self, other: "Kleisli[M, C, A]") -> "Kleisli[M, C, B]":
         """Compose Kleisli arrows: (self ∘ other)(c) = self(other(c)) >>= self.run"""
-        return Kleisli(lambda c: other.run(c).bind(self.run))  # type: ignore[attr-defined]
+        return Kleisli(lambda c: other.run(c).bind(self.run))
     
     def then(self, other: Kleisli[M, B, C]) -> Kleisli[M, A, C]:
         """Sequential composition: self >>= other"""
@@ -30,12 +30,12 @@ class Kleisli(Generic[M, A, B]):
     @classmethod
     def pure(cls, monad_cls: Type[M], value: B) -> "Kleisli[M, A, B]":
         """Pure arrow: pure(b) = λa. return b"""
-        return cls(lambda _: monad_cls.pure(value))  # type: ignore[attr-defined]
+        return cls(lambda _: monad_cls.pure(value))
     
     @classmethod  
     def id(cls, monad_cls: Type[M]) -> "Kleisli[M, A, A]":
         """Identity arrow: id = λa. return a"""
-        return cls(lambda a: monad_cls.pure(a))  # type: ignore[attr-defined,return-value]
+        return cls(lambda a: monad_cls.pure(a))
     
     def __call__(self, a: A) -> M:
         return self.run(a)
@@ -137,7 +137,7 @@ class KleisliCat:
         new_cat.arrows = dict(self.arrows)
         new_cat.composition = dict(self.composition)
         
-        new_cat.arrows[name] = kleisli_fn  # type: ignore[assignment]
+        new_cat.arrows[name] = kleisli_fn
         
         # Add identity composition laws for new arrow
         id_source = self.identities[source]
@@ -233,27 +233,27 @@ _auto_register_monads()
 # Utility functions for working with Kleisli arrows
 def lift(f: Callable[[A], B], monad_cls: Type[M]) -> Kleisli[M, A, B]:
     """Lift a pure function to a Kleisli arrow."""
-    return Kleisli(lambda a: monad_cls.pure(f(a)))  # type: ignore[attr-defined]
+    return Kleisli(lambda a: monad_cls.pure(f(a)))
 
 
 def join() -> Kleisli[object, object, object]:
     """Join operation as a Kleisli arrow."""
-    return Kleisli(lambda mma: mma.bind(lambda ma: ma))  # type: ignore[attr-defined]
+    return Kleisli(lambda mma: mma.bind(lambda ma: ma))
 
 
 def fmap(f: Callable[[A], B]) -> Callable[[M], M]:
     """Functor map as a function."""
-    return lambda ma: ma.map(f)  # type: ignore[attr-defined]
+    return lambda ma: ma.map(f)
 
 
 def ap(mf: M, ma: M) -> M:
     """Applicative ap as a function."""
-    return mf.ap(ma)  # type: ignore[attr-defined,no-any-return]
+    return mf.ap(ma)
 
 
 def bind(ma: M, f: Callable[[A], M]) -> M:
     """Monad bind as a function."""
-    return ma.bind(f)  # type: ignore[attr-defined,no-any-return]
+    return ma.bind(f)
 
 
 # Structural category helper used by tests

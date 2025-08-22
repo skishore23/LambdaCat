@@ -9,7 +9,7 @@ E = TypeVar("E")
 
 
 class Result(Generic[A, E]):
-    """Result monad with fail-fast semantics, modeled as a closed sum type.
+    """Result monad, modeled as a closed sum type.
 
     Use `Result.ok(value)` and `Result.err(error)` to construct values.
     """
@@ -27,7 +27,6 @@ class Result(Generic[A, E]):
     def pure(cls, value: A) -> "Result[A, E]":
         return cls.ok(value)
 
-    # Operations (implemented in subclasses; base raises to fail-fast on misuse)
     def map(self, f: Callable[[A], B]) -> "Result[B, E]":  # pragma: no cover - abstract behavior
         raise NotImplementedError
 

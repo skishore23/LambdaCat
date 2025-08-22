@@ -1,7 +1,7 @@
 """Adjunctions between categories.
 
 This module implements a basic adjunction framework with law checking.
-Following the fail-fast principle, all adjunction data must be explicitly provided.
+All adjunction data must be explicitly provided.
 """
 
 from __future__ import annotations
