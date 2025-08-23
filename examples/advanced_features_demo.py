@@ -50,7 +50,7 @@ E = Cat.from_presentation(p)
 eq_same = equalizer(E, "f", "f")  # f = f
 print(f"  Equalizer of f with itself: {eq_same.cone.apex if eq_same else 'None'}")
 
-eq_different = equalizer(E, "f", "g")  # f ≠ g 
+eq_different = equalizer(E, "f", "g")  # f ≠ g
 print(f"  Equalizer of f and g: {eq_different.cone.apex if eq_different else 'None'}")
 
 print("\n2. Adjunctions")
@@ -162,7 +162,7 @@ for email in test_emails:
 print("\n" + "=" * 30)
 print("Features shown:")
 print("- Limits (terminal objects, products, equalizers)")
-print("- Adjunctions with law checking")  
+print("- Adjunctions with law checking")
 print("- Kleisli categories for registered monads")
 print("- Real-world validation pipelines")
 print("\nDone!")
