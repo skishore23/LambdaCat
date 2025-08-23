@@ -1,0 +1,18 @@
+[pydocstyle]
+convention = google
+add_ignore = D100,D101,D102,D103,D104,D105,D107,D205,D212,D402,D415
+# Start with minimal checks - focus on existing docstrings being well-formed
+# D100: Missing docstring in public module
+# D101: Missing docstring in public class
+# D102: Missing docstring in public method
+# D103: Missing docstring in public function  
+# D104: Missing docstring in public package  
+# D105: Missing docstring in magic method
+# D107: Missing docstring in __init__
+# D205: 1 blank line required between summary line and description
+# D212: Multi-line docstring summary should start at the first line
+# D402: First line should not be the function's "signature"
+# D415: First line should end with a period, question mark, or exclamation point
+match = .*\.py
+match_dir = ^(?!tests).*
+# Only check source code, not tests

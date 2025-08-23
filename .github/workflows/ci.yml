@@ -45,6 +45,11 @@ jobs:
         pip install ruff
         ruff check .
         
+    - name: Run docstring audit
+      run: |
+        pip install pydocstyle
+        pydocstyle src/LambdaCat
+        
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
@@ -78,7 +83,7 @@ jobs:
     - name: Create laws badge
       run: |
         echo "Creating laws badge..."
-        echo "::set-output name=laws-badge::✅ Laws: All Passing"
+        echo "laws-badge=✅ Laws: All Passing" >> $GITHUB_OUTPUT
         
     - name: Comment on PR
       if: github.event_name == 'pull_request'

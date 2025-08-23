@@ -9,9 +9,7 @@ from LambdaCat.agents.runtime import compile_plan, compile_to_kleisli
 from LambdaCat.core.fp.instances.option import Option
 from LambdaCat.core.optics import Lens
 
-# -----------------------------
-# Pure actions (state -> state)
-# -----------------------------
+# Basic text processing functions
 
 def identity(x: str, ctx: Any | None = None) -> str:
     return x
@@ -38,13 +36,13 @@ def normalize_ws(x: str, ctx: Any | None = None) -> str:
 
 
 def summarize_head(x: str, ctx: Any | None = None) -> str:
-    # very small, deterministic "summary": first sentence or first 80 chars
+    # first sentence or first 80 chars
     head = x.split(".")[0]
     return head if head else (x[:80])
 
 
 def extract_keywords(x: str, ctx: Any | None = None) -> str:
-    # toy keyword extraction: unique words longer than 3, sorted
+    # unique words longer than 3 chars
     words = [w for w in x.split() if len(w) > 3]
     uniq = sorted(set(words))
     return " ".join(uniq)
@@ -66,23 +64,19 @@ Implementation: Mapping[str, Callable[..., str]] = {
 }
 
 
-# -----------------------------
 # Demo 1: Linear plan comparison
-# -----------------------------
 
 def demo_linear_plan(input_text: str) -> None:
-    # Create two different plans
     plan_a = sequence(Task("strip_ws"), Task("remove_noise"), Task("normalize_ws"))
     plan_b = sequence(Task("strip_ws"), Task("to_lower"), Task("normalize_ws"))
 
-    # Execute both plans and compare results
     executable_a = compile_plan(Implementation, plan_a)
     executable_b = compile_plan(Implementation, plan_b)
 
     result_a = executable_a(input_text)
     result_b = executable_b(input_text)
 
-    # Choose the shorter result (simple heuristic)
+    # pick the shorter one
     if len(result_a) <= len(result_b):
         chosen_plan = "Plan A"
         chosen_result = result_a
@@ -96,12 +90,9 @@ def demo_linear_plan(input_text: str) -> None:
     print(f"[Linear] Plan B result: {result_b}")
 
 
-# ---------------------------------------------
 # Demo 2: Structured plan (parallel + choose)
-# ---------------------------------------------
 
 def demo_structured_plan(input_text: str) -> None:
-    # Create a complex plan with parallel and choice operations
     plan = sequence(
         Task("strip_ws"),
         Task("remove_noise"),
@@ -109,12 +100,11 @@ def demo_structured_plan(input_text: str) -> None:
         choose(Task("to_upper"), Task("identity")),
     )
 
-    # Execute the plan with aggregation for parallel results
     def aggregate_parallel(results):
         return " | ".join(str(r) for r in results)
 
     def choose_first(results):
-        return 0 if results else 0  # Return index, not the result itself
+        return 0  # always pick first option
 
     executable = compile_plan(Implementation, plan,
                             aggregate_fn=aggregate_parallel,
@@ -123,15 +113,13 @@ def demo_structured_plan(input_text: str) -> None:
 
     print(f"[Structured] output: {result}")
 
-    # Also demonstrate Kleisli compilation
+    # also try with Kleisli
     kleisli_plan = compile_to_kleisli(Implementation, plan, Option)
     kleisli_result = kleisli_plan(input_text)
     print(f"[Structured] Kleisli result: {kleisli_result}")
 
 
-# ---------------------------------
 # Demo 3: Lens focus on nested state
-# ---------------------------------
 
 @dataclass(frozen=True)
 class Article:
@@ -140,13 +128,11 @@ class Article:
 
 
 def demo_focus_plan(article: Article) -> None:
-    # Create a lens for the article body
     body_lens = Lens(
         get=lambda a: a.body,
         set=lambda new_body, a: Article(title=a.title, body=new_body)
     )
 
-    # Create a plan that focuses on the body
     body_processing_plan = sequence(
         Task("strip_ws"),
         Task("to_lower"),
@@ -155,7 +141,6 @@ def demo_focus_plan(article: Article) -> None:
 
     plan = focus(body_lens, body_processing_plan)
 
-    # Execute the focused plan
     executable = compile_plan(Implementation, plan)
     result = executable(article)
 
@@ -166,15 +151,12 @@ def demo_focus_plan(article: Article) -> None:
         print(f"[Focus] Processed body: '{result.body}'")
     else:
         print(f"[Focus] Focus result: {result}")
-        print("[Focus] Note: Focus operation may need adjustment for this lens implementation")
+        print("[Focus] Note: Focus operation may need adjustment")
 
 
-# ---------------------------------
 # Demo 4: Loop + choose
-# ---------------------------------
 
 def demo_loop_and_choose(input_text: str) -> None:
-    # Loop: repeatedly strip noisy '!!' until none remain, then choose best variant by length
     def has_noise(s: str) -> bool:
         return "!!" in s
 
@@ -183,7 +165,7 @@ def demo_loop_and_choose(input_text: str) -> None:
         choose(Task("to_upper"), Task("identity")),
     )
 
-    # Choose the longer result (argmax by length)
+    # pick the longer result
     def choose_longest(results):
         if not results:
             return 0
@@ -196,12 +178,9 @@ def demo_loop_and_choose(input_text: str) -> None:
     print(f"[Loop+Choose] output: {result}")
 
 
-# ---------------------------------
 # Demo 5: Simple sequential execution
-# ---------------------------------
 
 def demo_simple_execution() -> None:
-    """Demonstrate simple sequential plan execution."""
     plan = sequence(
         Task("strip_ws"),
         Task("to_lower"),
@@ -217,13 +196,12 @@ def demo_simple_execution() -> None:
 
 
 def main() -> None:
-    """Run all agent demos."""
-    print("🤖 LambdaCat Agent Framework Demo")
-    print("=" * 40)
+    print("Agent Framework Demo")
+    print("=" * 30)
 
     sample = "  Hello, Lambda-Cat!!  AI agents, composable and typed.  "
 
-    print("\n1. Simple Sequential Execution:")
+    print("\n1. Simple Sequential:")
     demo_simple_execution()
 
     print("\n2. Linear Plan Comparison:")
@@ -240,7 +218,7 @@ def main() -> None:
     noisy_sample = "  Hello!! Lambda-Cat!! with noise!!  "
     demo_loop_and_choose(noisy_sample)
 
-    print("\n🎉 All agent demos completed successfully!")
+    print("\nDone!")
 
 
 if __name__ == "__main__":

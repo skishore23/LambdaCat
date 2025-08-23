@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from .ops_category import CommutativityReport
+
+if TYPE_CHECKING:
+    from .category import Cat
 
 
 @dataclass(frozen=True)
@@ -26,13 +30,10 @@ class Diagram:
                 raise ValueError(f"edge endpoints must be in objects: {s}->{t}")
         return Diagram(objs, es)
 
-    def check_commutativity(self, source: str, target: str, paths: Sequence[Sequence[str]]) -> CommutativityReport:
-        """Check commutativity of paths from source to target."""
-        # This requires a category context, so we'll need to pass it in
-        # Use ops_category.check_commutativity directly for full functionality
-        # Note: This method is kept for API compatibility but delegates to ops_category
-        # For now, return a simple report indicating this should use the full function
-        return CommutativityReport(True, {}, None)
+    def check_commutativity(self, C: Cat, source: str, target: str, paths: Sequence[Sequence[str]]) -> CommutativityReport:
+        """Check that provided paths from source to target commute in category C."""
+        from .ops_category import check_commutativity
+        return check_commutativity(C, source, target, paths)
 
     def to_mermaid(self) -> str:
         """Render diagram as Mermaid graph."""

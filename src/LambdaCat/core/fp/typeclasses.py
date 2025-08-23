@@ -50,7 +50,6 @@ def fmap(m: MonadT[A], f: Callable[[A], B]) -> MonadT[B]:
 	This helper is defined in terms of `bind` and `pure` to emphasize minimal
 	requirements.
 	"""
-
 	if not hasattr(m, "bind"):
 		raise TypeError("fmap requires a monad with a 'bind' method")
 	cls = type(m)

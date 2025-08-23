@@ -45,19 +45,37 @@ class Cat:
 		return Cat(p.objects, p.arrows, comp, ids)
 
 	def compose(self, left: str, right: str) -> str:
-		try:
-			left_arrow = next(a for a in self.arrows if a.name == left)
-			right_arrow = next(a for a in self.arrows if a.name == right)
-		except StopIteration as e:
-			raise KeyError(f"unknown arrow name in compose: ({left},{right})") from e
+		left_arrow = None
+		right_arrow = None
+
+		# Find arrows and provide detailed error messages
+		for a in self.arrows:
+			if a.name == left:
+				left_arrow = a
+			if a.name == right:
+				right_arrow = a
+
+		if left_arrow is None:
+			raise KeyError(f"Arrow '{left}' not found in category")
+		if right_arrow is None:
+			raise KeyError(f"Arrow '{right}' not found in category")
+
 		# Typed guard: dom(left) must equal cod(right) for (left∘right)
 		if left_arrow.source != right_arrow.target:
 			raise TypeError(
-				f"ill-typed compose: dom({left})={left_arrow.source} ≠ cod({right})={right_arrow.target}"
+				f"Cannot compose '{left}' ({left_arrow.source}→{left_arrow.target}) "
+				f"with '{right}' ({right_arrow.source}→{right_arrow.target}): "
+				f"domain of '{left}' ({left_arrow.source}) does not match "
+				f"codomain of '{right}' ({right_arrow.target})"
 			)
+
 		key = (left, right)
 		if key not in self.composition:
-			raise KeyError(f"composition not defined for typed pair ({left},{right})")
+			raise KeyError(
+				f"Composition of '{left}' ({left_arrow.source}→{left_arrow.target}) "
+				f"and '{right}' ({right_arrow.source}→{right_arrow.target}) "
+				f"is not defined in the composition table"
+			)
 		return self.composition[key]
 
 	def identity(self, obj_name: str) -> str:

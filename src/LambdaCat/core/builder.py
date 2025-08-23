@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from .category import Cat
 from .presentation import ArrowGen, Formal1, Obj, Presentation
 
 
@@ -45,4 +46,14 @@ def build_presentation(
 			raise ValueError(f"Duplicate arrow name: {g.name}")
 		_names.add(g.name)
 	return Presentation(objs, gens, tuple(relations))
+
+
+def normalize(C: Cat, path: Formal1) -> str:
+	"""Right-associate and fold a Formal1 to a single morphism name via C.compose."""
+	if not path.factors:
+		raise ValueError("empty path")
+	acc = path.factors[0]
+	for f in path.factors[1:]:
+		acc = C.compose(f, acc)  # g∘f convention
+	return acc
 

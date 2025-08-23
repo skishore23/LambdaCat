@@ -9,9 +9,6 @@ from .presentation import Obj
 
 def opposite_category(C: Cat) -> Cat:
     # create op arrow names by suffixing ^op and swapping endpoints
-    tuple(
-        (f"{a.name}^op", a.target, a.source) for a in C.arrows
-    )
     # mapping original name -> op name
     to_op: dict[str, str] = {a.name: f"{a.name}^op" for a in C.arrows}
     # composition: (g^op, f^op) = (f∘g)^op in C^op
@@ -161,7 +158,6 @@ def slice_category(C: Cat, A: str) -> Cat:
                     except Exception:
                         continue
     # Build Cat pieces
-    tuple(ArrowGen(name, src, tgt) for (name, src, tgt) in arrows_list)
     # composition: inherited from C on underlying h names
     comp: dict[tuple[str, str], str] = {}
     # Identities already added: (id_f, id_f) -> id_f
