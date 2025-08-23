@@ -23,16 +23,15 @@ classifiers = [
 [tool.poetry.dependencies]
 python = ">=3.11,<3.13"
 typing-extensions = {version = ">=4.7", python = "<3.11"}
-
-[tool.poetry.scripts]
-lambdacat = "LambdaCat.cli:main"
-
 # optional deps (extras; core should not import these at runtime)
 networkx = {version = ">=3.1", optional = true}
 graphviz = {version = ">=0.20.1", optional = true}
 pydot = {version = ">=1.4.2", optional = true}
 numpy = {version = ">=1.24", optional = true}
 jupyter = "^1.1.1"
+
+[tool.poetry.scripts]
+lambdacat = "LambdaCat.cli:main"
 
 [tool.poetry.extras]
 tamari = ["networkx"]
