@@ -15,15 +15,14 @@ This tests the complete async agent stack including:
 
 import asyncio
 import tempfile
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
 from src.LambdaCat.agents.actions import parallel, sequence, task
 from src.LambdaCat.agents.cognition.memory import AgentState
-from src.LambdaCat.agents.core.compile_async import run_plan
 from src.LambdaCat.agents.core.bus import create_agent_communicator, create_bus
-from src.LambdaCat.agents.core.compile_async import AsyncCompiler
+from src.LambdaCat.agents.core.compile_async import AsyncCompiler, run_plan
 from src.LambdaCat.agents.core.effect import Effect, Ok
 from src.LambdaCat.agents.core.instruments import get_observability
 from src.LambdaCat.agents.core.lens_effect import LensLaws, dict_lens, with_lens
@@ -63,7 +62,7 @@ class TestEffectMonad:
     @pytest.mark.asyncio
     async def test_effect_bind(self):
         """Test effect binding."""
-        def f(x: str) -> Effect[Dict[str, Any], str]:
+        def f(x: str) -> Effect[dict[str, Any], str]:
             return Effect.pure(f"processed_{x}")
 
         effect = Effect.pure("test").bind(f)
@@ -91,11 +90,11 @@ class TestEffectMonad:
     @pytest.mark.asyncio
     async def test_race_composition(self):
         """Test race effect composition."""
-        async def slow_effect(s: Dict[str, Any], ctx: Dict[str, Any]) -> tuple[Dict[str, Any], list[Dict[str, Any]], Any]:
+        async def slow_effect(s: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], Any]:
             await asyncio.sleep(0.1)
             return (s, [], Ok("slow"))
 
-        async def fast_effect(s: Dict[str, Any], ctx: Dict[str, Any]) -> tuple[Dict[str, Any], list[Dict[str, Any]], Any]:
+        async def fast_effect(s: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], Any]:
             await asyncio.sleep(0.01)
             return (s, [], Ok("fast"))
 
@@ -155,7 +154,7 @@ class TestAsyncCompiler:
     @pytest.mark.asyncio
     async def test_compile_task(self):
         """Test task compilation."""
-        async def test_action(state: Dict[str, Any], ctx: Dict[str, Any]) -> Dict[str, Any]:
+        async def test_action(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
             return {**state, "processed": True}
 
         actions = {"test_action": test_action}
@@ -175,10 +174,10 @@ class TestAsyncCompiler:
     @pytest.mark.asyncio
     async def test_compile_sequence(self):
         """Test sequence compilation."""
-        async def action1(state: Dict[str, Any], ctx: Dict[str, Any]) -> Dict[str, Any]:
+        async def action1(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
             return {**state, "step1": True}
 
-        async def action2(state: Dict[str, Any], ctx: Dict[str, Any]) -> Dict[str, Any]:
+        async def action2(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
             return {**state, "step2": True}
 
         actions = {"action1": action1, "action2": action2}
@@ -198,11 +197,11 @@ class TestAsyncCompiler:
     @pytest.mark.asyncio
     async def test_compile_parallel(self):
         """Test parallel compilation."""
-        async def action1(state: Dict[str, Any], ctx: Dict[str, Any]) -> Dict[str, Any]:
+        async def action1(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
             await asyncio.sleep(0.01)
             return {**state, "parallel1": True}
 
-        async def action2(state: Dict[str, Any], ctx: Dict[str, Any]) -> Dict[str, Any]:
+        async def action2(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
             await asyncio.sleep(0.01)
             return {**state, "parallel2": True}
 
@@ -223,11 +222,11 @@ class TestAsyncCompiler:
     @pytest.mark.asyncio
     async def test_parallel_policies(self):
         """Test different parallel execution policies."""
-        async def slow_action(state: Dict[str, Any], ctx: Dict[str, Any]) -> Dict[str, Any]:
+        async def slow_action(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
             await asyncio.sleep(0.1)
             return {**state, "slow": True}
 
-        async def fast_action(state: Dict[str, Any], ctx: Dict[str, Any]) -> Dict[str, Any]:
+        async def fast_action(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
             await asyncio.sleep(0.01)
             return {**state, "fast": True}
 
@@ -252,11 +251,11 @@ class TestAsyncCompiler:
     @pytest.mark.asyncio
     async def test_parallel_timeout(self):
         """Test parallel execution with timeout."""
-        async def slow_action(state: Dict[str, Any], ctx: Dict[str, Any]) -> Dict[str, Any]:
+        async def slow_action(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
             await asyncio.sleep(0.2)  # This should timeout
             return {**state, "slow": True}
 
-        async def fast_action(state: Dict[str, Any], ctx: Dict[str, Any]) -> Dict[str, Any]:
+        async def fast_action(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
             await asyncio.sleep(0.01)
             return {**state, "fast": True}
 
@@ -285,7 +284,7 @@ class TestLensIntegration:
     @pytest.mark.asyncio
     async def test_lens_effect(self):
         """Test lens effect composition."""
-        async def inner_effect(state: Dict[str, Any], ctx: Dict[str, Any]) -> tuple[Dict[str, Any], list[Dict[str, Any]], Any]:
+        async def inner_effect(state: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], Any]:
             new_state = {**state, "inner": "processed"}
             return (new_state, [], {"success": True, "result": new_state})
 
@@ -456,7 +455,7 @@ class TestObservability:
     def test_tracing(self):
         """Test tracing functionality."""
         obs = get_observability()
-        trace_id = obs.start_trace()
+        obs.start_trace()
 
         # Create spans
         span1 = obs.start_span("operation1")
@@ -528,14 +527,14 @@ class TestIntegration:
         http = create_http_adapter()
 
         # Define actions
-        async def parse_query(state: Dict[str, Any], ctx: Dict[str, Any]) -> Dict[str, Any]:
+        async def parse_query(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
             return {**state, "keywords": state["query"].split()}
 
-        async def search_web(state: Dict[str, Any], ctx: Dict[str, Any]) -> Dict[str, Any]:
+        async def search_web(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
             await asyncio.sleep(0.01)  # Simulate delay
             return {**state, "web_results": ["result1", "result2"]}
 
-        async def synthesize(state: Dict[str, Any], ctx: Dict[str, Any]) -> Dict[str, Any]:
+        async def synthesize(state: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
             llm = ctx["llm"]
             response = await llm.complete("Synthesize findings")
             return {**state, "synthesis": response.content}
