@@ -27,6 +27,10 @@ jobs:
         pip install -e .
         pip install pytest pytest-cov pytest-asyncio hypothesis
     
+    - name: Set PYTHONPATH
+      run: |
+        echo "PYTHONPATH=${{ github.workspace }}/src:$PYTHONPATH" >> $GITHUB_ENV
+    
     - name: Run tests with coverage
       run: |
         pytest --cov=src --cov-report=xml --cov-report=term-missing
@@ -74,6 +78,10 @@ jobs:
         python -m pip install --upgrade pip
         pip install -e .
         pip install pytest pytest-asyncio hypothesis
+    
+    - name: Set PYTHONPATH
+      run: |
+        echo "PYTHONPATH=${{ github.workspace }}/src:$PYTHONPATH" >> $GITHUB_ENV
     
     - name: Generate laws report
       run: |
