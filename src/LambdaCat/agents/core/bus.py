@@ -254,28 +254,7 @@ class RequestReplyBus(MessageBus):
         """Process messages and handle replies."""
         while self.running:
             try:
-                # Process all agent queues for replies
-                for agent_id, queue in self.agent_queues.items():
-                    try:
-                        message = queue.get_nowait()
-
-                        # Check if this is a reply
-                        if message.correlation_id and message.correlation_id in self.pending_replies:
-                            future = self.pending_replies[message.correlation_id]
-                            if not future.done():
-                                future.set_result(message)
-
-                        # Process with handlers
-                        for handler in self.handlers.get(message.topic, []):
-                            try:
-                                await handler.handle(message)
-                            except Exception as e:
-                                print(f"Handler error: {e}")
-
-                    except asyncio.QueueEmpty:
-                        continue
-
-                # Process topic queues
+                # Process topic queues only - agent queues are consumed directly
                 await super()._process_messages()
 
                 await asyncio.sleep(0.01)

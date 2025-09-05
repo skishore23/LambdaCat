@@ -433,11 +433,16 @@ class TestMessageBus:
             agent1 = await create_agent_communicator("agent1", bus)
             agent2 = await create_agent_communicator("agent2", bus)
 
+            # Get inbox before sending to ensure it's ready
+            inbox = await agent2.get_inbox()
+
             # Send message
             await agent1.send_direct("agent2", "hello from agent1")
 
+            # Small delay to ensure message is processed
+            await asyncio.sleep(0.01)
+
             # Receive message
-            inbox = await agent2.get_inbox()
             message = await asyncio.wait_for(inbox.get(), timeout=1.0)
             assert message.payload == "hello from agent1"
 
