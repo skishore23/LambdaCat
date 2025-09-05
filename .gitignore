@@ -29,3 +29,7 @@ venv/
 .cursorrules
 
 .hypothesis/
+
+watchdog_states
+
+research_results

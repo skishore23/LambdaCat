@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Awaitable, Mapping
 from dataclasses import dataclass
 from typing import Any, Callable, Final, Generic, TypeVar, Union
 
@@ -105,7 +105,8 @@ def loop_while(predicate: Callable[[State], bool], body: Plan[State, Ctx]) -> Pl
 # ------------------------------ Actions registry ------------------------------
 
 
-Fn = Callable[..., State]
+# Action function type - can be sync or async
+Fn = Callable[..., State | Awaitable[State]]
 
 
 @dataclass(frozen=True)

@@ -1,13 +1,15 @@
-from collections.abc import Mapping
+from __future__ import annotations
+
+import asyncio
+from collections.abc import Awaitable, Mapping
 from inspect import signature
 from typing import Callable, Generic, Protocol, TypeVar
 
-from LambdaCat.core.fp.kleisli import Kleisli
-from LambdaCat.core.fp.typeclasses import MonadT
-
+from ..core.fp.kleisli import Kleisli
+from ..core.fp.typeclasses import MonadT
 from ..core.presentation import Formal1
-from .actions import Choose, Focus, LoopWhile, Parallel, Plan, Task
-from .actions import Sequence as SeqNode
+from .actions import Plan
+from .core.compile_async import ActionRegistry, AsyncCompiler, ParallelSpec
 
 State = TypeVar("State")
 Ctx = TypeVar("Ctx")
@@ -16,33 +18,35 @@ T = TypeVar("T")
 
 
 class Action(Protocol, Generic[State, Ctx]):
-    def __call__(self, x: State, ctx: Ctx | None = None) -> State: ...
+    """Action protocol - can be sync or async."""
+    def __call__(self, x: State, ctx: Ctx | None = None) -> State | Awaitable[State]: ...
 
 
-def _call_action_generic(fn: Callable[..., TState], x: TState, ctx: Ctx | None) -> TState:
-    sig = signature(fn)
-    params = list(sig.parameters.values())
-    # Accept exactly 1 or 2 parameters; anything else is an error
-    if len(params) == 1:
-        return fn(x)
-    if len(params) == 2:
-        return fn(x, ctx)
-    raise TypeError("Action must accept 1 (x) or 2 (x, ctx) parameters")
+async def _maybe_await(x: State | Awaitable[State]) -> State:
+    """Await if coroutine, otherwise return as-is."""
+    return await x if asyncio.iscoroutine(x) else x
+
+
+async def call_action(fn: Action[State, Ctx], s: State, ctx: Ctx | None) -> State:
+    """Call an action (sync or async) and return the result."""
+    res = fn(s, ctx)
+    return await _maybe_await(res)
 
 
 def sequential_functor(
     implementation: Mapping[str, Action[State, Ctx]],
     mode: str = "sequential",
-) -> Callable[[Formal1], Callable[[State, Ctx | None], State]]:
+) -> Callable[[Formal1], Callable[[State, Ctx | None], Awaitable[State]]]:
+    """Create a sequential functor for async execution."""
     if mode != "sequential":
         raise ValueError("Only sequential mode is supported")
 
-    def F(plan: Formal1) -> Callable[[State, Ctx | None], State]:
-        def run(x: State, ctx: Ctx | None = None) -> State:
+    def F(plan: Formal1) -> Callable[[State, Ctx | None], Awaitable[State]]:
+        async def run(x: State, ctx: Ctx | None = None) -> State:
             value = x
             for step in plan.factors:
                 fn = implementation[step]
-                value = _call_action_generic(fn, value, ctx)
+                value = await call_action(fn, value, ctx)
             return value
         return run
 
@@ -57,73 +61,88 @@ def compile_to_kleisli(
 ) -> Kleisli[MonadT[object], State, State]:
     """Compile a plan to a Kleisli arrow for the given monad.
 
-    Note: Complex plans with parallel and choose operations may not work correctly
-    in Kleisli context. For complex plans, use compile_plan instead.
+    This compiles the plan using the async runtime and converts the result
+    to a Kleisli arrow that can be used with the specified monad.
     """
     if mode not in ("monadic", "applicative"):
         raise ValueError("mode must be 'monadic' or 'applicative'")
 
-    def compile_rec(p: Plan[State, Ctx]) -> Kleisli[MonadT[object], State, State]:
-        if isinstance(p, Task):
-            # Convert action to Kleisli
-            action = implementation[p.name]
-            return Kleisli(lambda s: monad_cls.pure(action(s)))  # type: ignore[arg-type,return-value]
+    # Convert to ActionRegistry format
+    actions: ActionRegistry[State] = {}
+    for name, action in implementation.items():
+        actions[name] = action
 
-        elif isinstance(p, SeqNode):
-            # Sequential composition
-            if not p.items:
-                return Kleisli.id(monad_cls)
-            first = compile_rec(p.items[0])
-            rest = compile_rec(SeqNode(p.items[1:])) if len(p.items) > 1 else Kleisli.id(monad_cls)
-            return rest.compose(first)
+    # Use AsyncCompiler to get the Effect
+    compiler = AsyncCompiler(actions)
+    effect = compiler.compile(plan)
 
-        elif isinstance(p, Parallel):
-            # Parallel operations are not supported in Kleisli compilation
-            # Convert to sequential for compatibility
-            if not p.items:
-                return Kleisli.id(monad_cls)
+    def kleisli_run(s: State) -> MonadT[object]:
+        """Convert async Effect to Kleisli arrow."""
+        # Run the effect synchronously and wrap result in the monad
+        try:
+            import asyncio
+            final_state, _, result = asyncio.run(effect.run(s, {}))
 
-            # Compile as sequential plan
-            return compile_rec(SeqNode(p.items))
+            # Check if result is an error
+            if hasattr(result, 'error'):
+                # Return empty monad for errors
+                return monad_cls.empty() if hasattr(monad_cls, 'empty') else monad_cls.pure(s)
 
-        elif isinstance(p, Choose):
-            # Choose operations are not supported in Kleisli compilation
-            # Convert to first item for compatibility
-            if not p.items:
-                raise ValueError("Choose with no items")
+            # Return the final state wrapped in the monad
+            return monad_cls.pure(final_state)
+        except Exception:
+            # Return empty monad for exceptions
+            return monad_cls.empty() if hasattr(monad_cls, 'empty') else monad_cls.pure(s)
 
-            return compile_rec(p.items[0])
+    return Kleisli(kleisli_run)
 
-        elif isinstance(p, Focus):
-            # Focus on a sub-state
-            inner = compile_rec(p.inner)
-            return Kleisli(lambda s:  # type: ignore[arg-type,return-value]
-                monad_cls.pure(p.lens.set(inner(p.lens.get(s)), s)))
 
-        elif isinstance(p, LoopWhile):
-            # Loop while predicate is true
-            def loop_run(s: State) -> MonadT[object]:  # type: ignore[valid-type]
-                current = s
-                while p.predicate(current):
-                    result = compile_rec(p.body)(current)
-                    if isinstance(result, monad_cls):
-                        # Extract from monad for loop condition
-                        current = result.get_or_else(current) if hasattr(result, 'get_or_else') else current
-                    else:
-                        current = result
-                return monad_cls.pure(current)  # type: ignore[assignment]
+def compile_plan(
+    implementation: Mapping[str, Action[State, Ctx]],
+    plan: Plan[State, Ctx],
+    *,
+    choose_fn: Callable[[list[object]], int] | None = None,
+    aggregate_fn: Callable[[list[object]], object] | None = None,
+    parallel_spec: ParallelSpec | None = None,
+) -> Callable[[State, Ctx | None], Awaitable[State]]:
+    """Compile a plan to an async executable function.
 
-            return Kleisli(loop_run)
+    This is the main entry point for plan compilation.
+    """
+    # Convert to ActionRegistry format
+    actions: ActionRegistry[State] = {}
+    for name, action in implementation.items():
+        actions[name] = action
 
-        else:
-            raise TypeError(f"Unknown plan type: {type(p)}")
+    # Use AsyncCompiler with parallel spec
+    compiler = AsyncCompiler(actions, default_parallel_spec=parallel_spec)
+    effect = compiler.compile(plan)
 
-    return compile_rec(plan)
+    async def run_async(x: State, ctx: Ctx | None = None) -> State:
+        final_state, _, result = await effect.run(x, ctx or {})
+        if hasattr(result, 'error'):
+            raise RuntimeError(f"Plan execution failed: {result.error}")
+        return final_state
+
+    return run_async
 
 
 # Re-export helper for agents (generic)
-def call_action(fn: Callable[..., TState], x: TState, ctx: Ctx | None) -> TState:
+def call_action_sync(fn: Callable[..., TState], x: TState, ctx: Ctx | None) -> TState:
+    """Call a sync action - for backward compatibility with existing code."""
     return _call_action_generic(fn, x, ctx)
+
+
+def _call_action_generic(fn: Callable[..., TState], x: TState, ctx: Ctx | None) -> TState:
+    """Generic action caller for sync functions."""
+    sig = signature(fn)
+    params = list(sig.parameters.values())
+    # Accept exactly 1 or 2 parameters; anything else is an error
+    if len(params) == 1:
+        return fn(x)
+    if len(params) == 2:
+        return fn(x, ctx)
+    raise TypeError("Action must accept 1 (x) or 2 (x, ctx) parameters")
 
 
 # Structured plan interpreter (Seq / Par / Choose / Focus / LoopWhile)
@@ -135,6 +154,7 @@ AggregateFn = Callable[[list[object]], object]
 
 
 def concat(sep: str = "") -> Callable[[list[str]], str]:
+    """Concatenate strings with separator."""
     def _agg(outputs: list[str]) -> str:
         if not outputs:
             return "" if sep == "" else sep.join([])
@@ -143,6 +163,7 @@ def concat(sep: str = "") -> Callable[[list[str]], str]:
 
 
 def first() -> Callable[[list[T]], int]:
+    """Choose first item."""
     def _choose(outputs: list[T]) -> int:
         if not outputs:
             raise AssertionError("choose on empty outputs")
@@ -151,6 +172,7 @@ def first() -> Callable[[list[T]], int]:
 
 
 def argmax(by: Callable[[T], float]) -> Callable[[list[T]], int]:
+    """Choose item with maximum score."""
     def _choose(outputs: list[T]) -> int:
         if not outputs:
             raise AssertionError("choose on empty outputs")
@@ -158,89 +180,4 @@ def argmax(by: Callable[[T], float]) -> Callable[[list[T]], int]:
         best = max(range(len(scores)), key=lambda i: scores[i])
         return best
     return _choose
-
-
-def _compile_plan(
-    implementation: Mapping[str, Action[State, Ctx]],
-    plan: Plan[State, Ctx],
-    *,
-    choose_fn: ChooseFn | None,
-    aggregate_fn: AggregateFn | None,
-) -> Callable[[State, Ctx | None], State]:
-    if isinstance(plan, Task):
-        fn = implementation[plan.name]
-
-        def run_atom(x: State, ctx: Ctx | None = None) -> State:
-            return _call_action_generic(fn, x, ctx)
-
-        return run_atom
-
-    elif isinstance(plan, SeqNode):
-        items = [_compile_plan(implementation, item, choose_fn=choose_fn, aggregate_fn=aggregate_fn) for item in plan.items]
-
-        def run_seq(x: State, ctx: Ctx | None = None) -> State:
-            value = x
-            for item in items:
-                value = item(value, ctx)
-            return value
-
-        return run_seq
-
-    elif isinstance(plan, Parallel):
-        items = [_compile_plan(implementation, item, choose_fn=choose_fn, aggregate_fn=aggregate_fn) for item in plan.items]
-
-        def run_par(x: State, ctx: Ctx | None = None) -> State:
-            if not aggregate_fn:
-                raise ValueError("Parallel execution requires aggregate_fn")
-            outputs = [item(x, ctx) for item in items]
-            return aggregate_fn(outputs)  # type: ignore[no-any-return]
-
-        return run_par
-
-    elif isinstance(plan, Choose):
-        items = [_compile_plan(implementation, item, choose_fn=choose_fn, aggregate_fn=aggregate_fn) for item in plan.items]
-
-        def run_choose(x: State, ctx: Ctx | None = None) -> State:
-            if not choose_fn:
-                raise ValueError("Choose execution requires choose_fn")
-            outputs = [item(x, ctx) for item in items]
-            choice_idx = choose_fn(outputs)
-            return outputs[choice_idx]
-
-        return run_choose
-
-    elif isinstance(plan, Focus):
-        inner = _compile_plan(implementation, plan.inner, choose_fn=choose_fn, aggregate_fn=aggregate_fn)
-
-        def run_focus(x: State, ctx: Ctx | None = None) -> State:
-            sub_state = plan.lens.get(x)
-            new_sub_state = inner(sub_state, ctx)
-            return plan.lens.set(x, new_sub_state)
-
-        return run_focus
-
-    elif isinstance(plan, LoopWhile):
-        body = _compile_plan(implementation, plan.body, choose_fn=choose_fn, aggregate_fn=aggregate_fn)
-
-        def run_loop(x: State, ctx: Ctx | None = None) -> State:
-            current = x
-            while plan.predicate(current):
-                current = body(current, ctx)
-            return current
-
-        return run_loop
-
-    else:
-        raise TypeError(f"Unknown plan type: {type(plan)}")
-
-
-def compile_plan(
-    implementation: Mapping[str, Action[State, Ctx]],
-    plan: Plan[State, Ctx],
-    *,
-    choose_fn: ChooseFn | None = None,
-    aggregate_fn: AggregateFn | None = None,
-) -> Callable[[State, Ctx | None], State]:
-    """Compile a plan to an executable function."""
-    return _compile_plan(implementation, plan, choose_fn=choose_fn, aggregate_fn=aggregate_fn)
 
