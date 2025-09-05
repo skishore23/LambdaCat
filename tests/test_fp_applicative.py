@@ -5,9 +5,9 @@ from typing import Callable
 import hypothesis.strategies as st
 from hypothesis import given
 
-from LambdaCat.core.fp.instances.either import Either
-from LambdaCat.core.fp.instances.identity import Id
-from LambdaCat.core.fp.instances.maybe import Maybe
+from src.LambdaCat.core.fp.instances.either import Either
+from src.LambdaCat.core.fp.instances.identity import Id
+from src.LambdaCat.core.fp.instances.maybe import Maybe
 
 
 def int_functions() -> list[Callable[[int], int]]:

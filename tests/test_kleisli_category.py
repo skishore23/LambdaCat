@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from LambdaCat.core.fp.kleisli import kleisli_category
-from LambdaCat.core.laws import run_suite
-from LambdaCat.core.laws_category import CATEGORY_SUITE
+from src.LambdaCat.core.fp.kleisli import kleisli_category
+from src.LambdaCat.core.laws import run_suite
+from src.LambdaCat.core.laws_category import CATEGORY_SUITE
 
 
 def test_kleisli_structural_category_laws() -> None:

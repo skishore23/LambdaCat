@@ -2,7 +2,7 @@
 
 import pytest
 
-from LambdaCat.core import (
+from src.LambdaCat.core import (
     ADJUNCTION_SUITE,
     Cat,
     arrow,
@@ -14,15 +14,15 @@ from LambdaCat.core import (
     run_suite,
     terminal_object,
 )
-from LambdaCat.core.fp import (
+from src.LambdaCat.core.fp import (
     Kleisli,
     get_registered_monads,
     kleisli_category_for,
     register_monad,
 )
-from LambdaCat.core.fp.instances.option import Option
-from LambdaCat.core.fp.instances.state import State
-from LambdaCat.core.standard import discrete, terminal_category
+from src.LambdaCat.core.fp.instances.option import Option
+from src.LambdaCat.core.fp.instances.state import State
+from src.LambdaCat.core.standard import discrete, terminal_category
 
 
 class TestLimits:

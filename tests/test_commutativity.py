@@ -1,7 +1,7 @@
 import pytest
 
-from LambdaCat.core import Cat, arrow, build_presentation, obj
-from LambdaCat.core.ops_category import check_commutativity, paths
+from src.LambdaCat.core import Cat, arrow, build_presentation, obj
+from src.LambdaCat.core.ops_category import check_commutativity, paths
 
 
 @pytest.mark.laws

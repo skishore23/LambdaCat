@@ -12,14 +12,14 @@ import pytest
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from LambdaCat.core.fp.instances.option import Option
-from LambdaCat.core.fp.instances.result import Result
-from LambdaCat.core.laws import run_suite
-from LambdaCat.core.laws_applicative import APPLICATIVE_SUITE
-from LambdaCat.core.laws_category import CATEGORY_SUITE
-from LambdaCat.core.laws_functor import FUNCTOR_SUITE
-from LambdaCat.core.laws_monad import MONAD_SUITE
-from LambdaCat.core.standard import (
+from src.LambdaCat.core.fp.instances.option import Option
+from src.LambdaCat.core.fp.instances.result import Result
+from src.LambdaCat.core.laws import run_suite
+from src.LambdaCat.core.laws_applicative import APPLICATIVE_SUITE
+from src.LambdaCat.core.laws_category import CATEGORY_SUITE
+from src.LambdaCat.core.laws_functor import FUNCTOR_SUITE
+from src.LambdaCat.core.laws_monad import MONAD_SUITE
+from src.LambdaCat.core.standard import (
     discrete,
     monoid_category,
     poset_category,
@@ -184,7 +184,7 @@ try:
     @given(st.integers(min_value=1, max_value=5))
     def test_hypothesis_simplex_associativity(n):
         """Test associativity on generated simplex categories using Hypothesis."""
-        from LambdaCat.core.standard import simplex
+        from src.LambdaCat.core.standard import simplex
 
         if n <= 3:  # Keep it small to avoid combinatorial explosion
             cat = simplex(n)

@@ -1,7 +1,7 @@
 """Tests for limits diagnostics."""
 
 
-from LambdaCat.core import (
+from src.LambdaCat.core import (
     Cat,
     arrow,
     build_presentation,

@@ -1,8 +1,8 @@
 """Tests for the rewriting system."""
 
 
-from LambdaCat.core import Formal1, arrow, build_presentation, obj
-from LambdaCat.core.rewriting import (
+from src.LambdaCat.core import Formal1, arrow, build_presentation, obj
+from src.LambdaCat.core.rewriting import (
     RewriteRule,
     equal_modulo_relations,
     normalize_with_rules,

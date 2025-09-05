@@ -1,11 +1,11 @@
 import pytest
 
-from LambdaCat.core.functor import FunctorBuilder
-from LambdaCat.core.laws import run_suite
-from LambdaCat.core.laws_functor import FUNCTOR_SUITE
-from LambdaCat.core.laws_natural import NATURAL_SUITE
-from LambdaCat.core.natural import Natural
-from LambdaCat.core.standard import simplex, walking_isomorphism
+from src.LambdaCat.core.functor import FunctorBuilder
+from src.LambdaCat.core.laws import run_suite
+from src.LambdaCat.core.laws_functor import FUNCTOR_SUITE
+from src.LambdaCat.core.laws_natural import NATURAL_SUITE
+from src.LambdaCat.core.natural import Natural
+from src.LambdaCat.core.standard import simplex, walking_isomorphism
 
 
 @pytest.mark.laws

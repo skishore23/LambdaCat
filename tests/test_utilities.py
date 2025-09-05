@@ -4,10 +4,10 @@ Test utilities and advanced features for LambdaCat.
 This tests the Phase 5 implementations from the ActionList.
 """
 
-from LambdaCat.core import Cat
-from LambdaCat.core.functor import FunctorBuilder
-from LambdaCat.core.natural import Natural
-from LambdaCat.core.standard import discrete, monoid_category, poset_category, simplex
+from src.LambdaCat.core import Cat
+from src.LambdaCat.core.functor import FunctorBuilder
+from src.LambdaCat.core.natural import Natural
+from src.LambdaCat.core.standard import discrete, monoid_category, poset_category, simplex
 
 
 class TestUtilities:

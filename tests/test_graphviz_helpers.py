@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from LambdaCat.core import Diagram, check_graphviz_available, render_dot_string, render_to_file
+from src.LambdaCat.core import Diagram, check_graphviz_available, render_dot_string, render_to_file
 
 
 def test_check_graphviz_available_no_package():

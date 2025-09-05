@@ -2,7 +2,7 @@
 
 import pytest
 
-from LambdaCat.core import Cat, Formal1, arrow, build_presentation, normalize, obj, simplex
+from src.LambdaCat.core import Cat, Formal1, arrow, build_presentation, normalize, obj, simplex
 
 
 def test_normalize_single_arrow():

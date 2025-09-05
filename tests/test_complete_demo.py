@@ -4,26 +4,26 @@ Comprehensive test demonstrating all LambdaCat capabilities.
 This test file serves as both a test suite and a working demo of the library.
 """
 
-from LambdaCat.agents.actions import parallel, sequence, task
-from LambdaCat.agents.runtime import compile_plan, compile_to_kleisli
-from LambdaCat.core import Cat, arrow, build_presentation, obj
-from LambdaCat.core.diagram import Diagram
-from LambdaCat.core.fp.instances.option import Option
-from LambdaCat.core.fp.instances.reader import Reader
-from LambdaCat.core.fp.instances.result import Result
-from LambdaCat.core.fp.instances.state import State
-from LambdaCat.core.fp.instances.writer import Writer
-from LambdaCat.core.fp.kleisli import Kleisli
-from LambdaCat.core.functor import FunctorBuilder
-from LambdaCat.core.laws import run_suite
-from LambdaCat.core.laws_applicative import APPLICATIVE_SUITE
-from LambdaCat.core.laws_category import CATEGORY_SUITE
-from LambdaCat.core.laws_functor import FUNCTOR_SUITE
-from LambdaCat.core.laws_monad import MONAD_SUITE
-from LambdaCat.core.natural import Natural, check_naturality
-from LambdaCat.core.ops_category import check_commutativity
-from LambdaCat.core.optics import focus, iso, lens, preview, prism, review, set_value, view
-from LambdaCat.core.standard import discrete, simplex, walking_isomorphism
+from src.LambdaCat.agents.actions import parallel, sequence, task
+from src.LambdaCat.agents.entities import Goal, create_agent_entity
+from src.LambdaCat.core import Cat, arrow, build_presentation, obj
+from src.LambdaCat.core.diagram import Diagram
+from src.LambdaCat.core.fp.instances.option import Option
+from src.LambdaCat.core.fp.instances.reader import Reader
+from src.LambdaCat.core.fp.instances.result import Result
+from src.LambdaCat.core.fp.instances.state import State
+from src.LambdaCat.core.fp.instances.writer import Writer
+from src.LambdaCat.core.fp.kleisli import Kleisli
+from src.LambdaCat.core.functor import FunctorBuilder
+from src.LambdaCat.core.laws import run_suite
+from src.LambdaCat.core.laws_applicative import APPLICATIVE_SUITE
+from src.LambdaCat.core.laws_category import CATEGORY_SUITE
+from src.LambdaCat.core.laws_functor import FUNCTOR_SUITE
+from src.LambdaCat.core.laws_monad import MONAD_SUITE
+from src.LambdaCat.core.natural import Natural, check_naturality
+from src.LambdaCat.core.ops_category import check_commutativity
+from src.LambdaCat.core.optics import focus, iso, lens, preview, prism, review, set_value, view
+from src.LambdaCat.core.standard import discrete, simplex, walking_isomorphism
 
 
 class TestCompleteDemo:
@@ -329,8 +329,8 @@ class TestCompleteDemo:
         assert parsed["first"] == "Jane"
         assert parsed["last"] == "Smith"
 
-    def test_agents_and_plans(self):
-        """Test agent framework with plan composition."""
+    async def test_agents_and_plans(self):
+        """Test async agent framework with plan composition."""
         # Create simple tasks
         increment_task = task("increment")
         double_task = task("double")
@@ -338,29 +338,55 @@ class TestCompleteDemo:
         # Sequential composition
         plan = sequence(increment_task, double_task)
 
-        # Define actions
+        # Define async actions
+        async def increment_action(state: dict, ctx: dict) -> dict:
+            return {**state, "value": state.get("value", 0) + 1}
+
+        async def double_action(state: dict, ctx: dict) -> dict:
+            return {**state, "value": state.get("value", 0) * 2}
+
         actions = {
-            "increment": lambda x: x + 1,
-            "double": lambda x: x * 2
+            "increment": increment_action,
+            "double": double_action
         }
 
-        # Compile to executable function
-        executable = compile_plan(actions, plan)
-        result = executable(5)
-        assert result == 12
+        # Create agent entity
+        goal = Goal(
+            name="process_number",
+            params={"initial_value": 5}
+        )
 
-        # Compile to Kleisli arrow
-        kleisli_plan = compile_to_kleisli(actions, plan, Option)
-        result = kleisli_plan(5)
-        assert isinstance(result, Option)
-        assert result.is_some()
-        assert result.get_or_else(0) == 12
+        agent = create_agent_entity(
+            agent_id="demo_agent",
+            goals=[goal],
+            skills=actions,
+            goal_to_plan={"process_number": plan}
+        )
+
+        # Test agent execution
+        initial_state = {"value": 5}
+        effect = agent.runtime.compile(plan)
+        final_state, trace, result = await effect.run(initial_state, {})
+
+        assert final_state["value"] == 12
+        from src.LambdaCat.agents.core.effect import Ok
+        assert isinstance(result, Ok)
 
         # Test parallel composition
         parallel_plan = parallel(increment_task, double_task)
-        executable = compile_plan(actions, parallel_plan, aggregate_fn=lambda xs: xs[0])
-        result = executable(5)
-        assert result == 6  # increment result
+        agent_parallel = create_agent_entity(
+            agent_id="parallel_agent",
+            goals=[goal],
+            skills=actions,
+            goal_to_plan={"process_number": parallel_plan}
+        )
+
+        effect_parallel = agent_parallel.runtime.compile(parallel_plan)
+        final_state_parallel, trace_parallel, result_parallel = await effect_parallel.run(initial_state, {})
+
+        assert isinstance(result_parallel, Ok)
+        # Parallel should execute both tasks
+        assert len(trace_parallel) >= 2
 
     def test_diagrams_and_commutativity(self):
         """Test diagram construction and commutativity checking."""
@@ -458,13 +484,8 @@ class TestCompleteDemo:
         updated_data = focus(value_lens, lambda x: x * 2)(data)
         assert updated_data["value"] == 84
 
-        # Use agents
-        plan = sequence(task("increment"), task("double"))
-        actions = {"increment": lambda x: x + 1, "double": lambda x: x * 2}
-
-        executable = compile_plan(actions, plan)
-        result = executable(5)
-        assert result == 12
+        # Use async agents (demonstrated in test_agents_and_plans above)
+        # Agent entities provide persistent, goal-oriented behavior
 
         # Check laws
         category_report = run_suite(C, CATEGORY_SUITE)
@@ -474,7 +495,8 @@ class TestCompleteDemo:
         assert functor_report.ok
 
 
-if __name__ == "__main__":
+async def main():
+    """Run the complete demo with async support."""
     # Run the demo
     test = TestCompleteDemo()
 
@@ -515,7 +537,7 @@ if __name__ == "__main__":
     test.test_optics()
     print("✓ Optics")
 
-    test.test_agents_and_plans()
+    await test.test_agents_and_plans()
     print("✓ Agents and plans")
 
     test.test_diagrams_and_commutativity()
@@ -530,3 +552,8 @@ if __name__ == "__main__":
     print("\n" + "=" * 50)
     print("🎉 All LambdaCat features working correctly!")
     print("The library is ready for production use.")
+
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())

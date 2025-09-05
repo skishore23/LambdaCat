@@ -2,7 +2,7 @@
 
 import pytest
 
-from LambdaCat.core import (
+from src.LambdaCat.core import (
     discrete,
     hom,
     is_iso,

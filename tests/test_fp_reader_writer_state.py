@@ -5,10 +5,10 @@ from typing import Callable, TypeVar
 import hypothesis.strategies as st
 from hypothesis import given
 
-from LambdaCat.core.fp.instances.reader import Reader
-from LambdaCat.core.fp.instances.state import State
-from LambdaCat.core.fp.instances.writer import Writer
-from LambdaCat.core.fp.typeclasses import Monoid
+from src.LambdaCat.core.fp.instances.reader import Reader
+from src.LambdaCat.core.fp.instances.state import State
+from src.LambdaCat.core.fp.instances.writer import Writer
+from src.LambdaCat.core.fp.typeclasses import Monoid
 
 A = TypeVar("A")
 R = TypeVar("R")
