@@ -41,6 +41,7 @@ all = ["networkx", "graphviz", "pydot", "numpy"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.2"
+pytest-asyncio = ">=0.24"
 hypothesis = ">=6.98"
 mypy = ">=1.8"
 ruff = ">=0.5.0"
