@@ -86,7 +86,6 @@ class PatchMonoid(Monoid[Patch[S]]):
 # Helper for creating state merge functions
 def create_state_merger(merge_strategy: str = "left_biased") -> Callable[[S, S], S]:
     """Create a state merge function with the specified strategy."""
-
     if merge_strategy == "left_biased":
         return patch_combine
     elif merge_strategy == "right_biased":

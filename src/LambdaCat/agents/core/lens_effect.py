@@ -49,7 +49,6 @@ def compose_lens_effects(
     This preserves lens composition laws:
     (f . g) . h = f . (g . h)
     """
-
     # Compose lenses
     composed_lens = Lens(
         get=lambda s: inner_lens.get(outer_lens.get(s)),

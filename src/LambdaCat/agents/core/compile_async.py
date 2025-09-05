@@ -62,7 +62,6 @@ class AsyncCompiler(Generic[S, Ctx]):
         - Focus -> lens composition (functorial)
         - LoopWhile -> iterative bind (monadic)
         """
-
         if isinstance(plan, Task):
             return self._compile_task(plan)
         elif isinstance(plan, Sequence):
