@@ -6,7 +6,7 @@ import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import uuid4
 
 
@@ -17,12 +17,12 @@ class Span:
     id: str
     name: str
     start_time: float
-    end_time: Optional[float] = None
-    duration_ms: Optional[float] = None
-    tags: Dict[str, Any] = field(default_factory=dict)
-    logs: List[Dict[str, Any]] = field(default_factory=list)
-    parent_id: Optional[str] = None
-    trace_id: Optional[str] = None
+    end_time: float | None = None
+    duration_ms: float | None = None
+    tags: dict[str, Any] = field(default_factory=dict)
+    logs: list[dict[str, Any]] = field(default_factory=list)
+    parent_id: str | None = None
+    trace_id: str | None = None
 
     def finish(self) -> Span:
         """Finish the span and calculate duration."""
@@ -79,7 +79,7 @@ class Span:
             trace_id=self.trace_id
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "id": self.id,
@@ -101,10 +101,10 @@ class Metric:
     name: str
     value: float
     timestamp: float
-    tags: Dict[str, str] = field(default_factory=dict)
+    tags: dict[str, str] = field(default_factory=dict)
     unit: str = "count"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "name": self.name,
@@ -119,11 +119,11 @@ class Tracer:
     """Tracing system for observability."""
 
     def __init__(self):
-        self.spans: List[Span] = []
-        self.active_spans: Dict[str, Span] = {}
-        self.trace_id: Optional[str] = None
+        self.spans: list[Span] = []
+        self.active_spans: dict[str, Span] = {}
+        self.trace_id: str | None = None
 
-    def start_trace(self, trace_id: Optional[str] = None) -> str:
+    def start_trace(self, trace_id: str | None = None) -> str:
         """Start a new trace."""
         self.trace_id = trace_id or str(uuid4())
         return self.trace_id
@@ -131,12 +131,12 @@ class Tracer:
     def start_span(
         self,
         name: str,
-        parent_id: Optional[str] = None,
-        tags: Optional[Dict[str, Any]] = None
+        parent_id: str | None = None,
+        tags: dict[str, Any] | None = None
     ) -> Span:
         """Start a new span."""
         span_id = str(uuid4())
-        parent_span = self.active_spans.get(parent_id) if parent_id else None
+        self.active_spans.get(parent_id) if parent_id else None
 
         span = Span(
             id=span_id,
@@ -161,7 +161,7 @@ class Tracer:
 
         return finished_span
 
-    def get_trace(self) -> List[Span]:
+    def get_trace(self) -> list[Span]:
         """Get all spans in the current trace."""
         return list(self.spans)
 
@@ -193,12 +193,12 @@ class MetricsCollector:
     """Metrics collection system."""
 
     def __init__(self):
-        self.metrics: List[Metric] = []
-        self.counters: Dict[str, float] = {}
-        self.gauges: Dict[str, float] = {}
-        self.histograms: Dict[str, List[float]] = {}
+        self.metrics: list[Metric] = []
+        self.counters: dict[str, float] = {}
+        self.gauges: dict[str, float] = {}
+        self.histograms: dict[str, list[float]] = {}
 
-    def counter(self, name: str, value: float = 1.0, tags: Optional[Dict[str, str]] = None) -> None:
+    def counter(self, name: str, value: float = 1.0, tags: dict[str, str] | None = None) -> None:
         """Record a counter metric."""
         self.counters[name] = self.counters.get(name, 0.0) + value
 
@@ -211,7 +211,7 @@ class MetricsCollector:
         )
         self.metrics.append(metric)
 
-    def gauge(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
+    def gauge(self, name: str, value: float, tags: dict[str, str] | None = None) -> None:
         """Record a gauge metric."""
         self.gauges[name] = value
 
@@ -224,7 +224,7 @@ class MetricsCollector:
         )
         self.metrics.append(metric)
 
-    def histogram(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
+    def histogram(self, name: str, value: float, tags: dict[str, str] | None = None) -> None:
         """Record a histogram metric."""
         if name not in self.histograms:
             self.histograms[name] = []
@@ -239,23 +239,23 @@ class MetricsCollector:
         )
         self.metrics.append(metric)
 
-    def timer(self, name: str, tags: Optional[Dict[str, str]] = None) -> Timer:
+    def timer(self, name: str, tags: dict[str, str] | None = None) -> Timer:
         """Create a timer metric."""
         return Timer(self, name, tags)
 
-    def get_metrics(self) -> List[Metric]:
+    def get_metrics(self) -> list[Metric]:
         """Get all recorded metrics."""
         return list(self.metrics)
 
-    def get_counters(self) -> Dict[str, float]:
+    def get_counters(self) -> dict[str, float]:
         """Get current counter values."""
         return dict(self.counters)
 
-    def get_gauges(self) -> Dict[str, float]:
+    def get_gauges(self) -> dict[str, float]:
         """Get current gauge values."""
         return dict(self.gauges)
 
-    def get_histogram_stats(self, name: str) -> Optional[Dict[str, float]]:
+    def get_histogram_stats(self, name: str) -> dict[str, float] | None:
         """Get histogram statistics."""
         if name not in self.histograms or not self.histograms[name]:
             return None
@@ -295,11 +295,11 @@ class MetricsCollector:
 class Timer:
     """Context manager for timing operations."""
 
-    def __init__(self, collector: MetricsCollector, name: str, tags: Optional[Dict[str, str]] = None):
+    def __init__(self, collector: MetricsCollector, name: str, tags: dict[str, str] | None = None):
         self.collector = collector
         self.name = name
         self.tags = tags or {}
-        self.start_time: Optional[float] = None
+        self.start_time: float | None = None
 
     def __enter__(self) -> Timer:
         self.start_time = time.perf_counter()
@@ -328,15 +328,15 @@ class ObservabilityManager:
         self.metrics = MetricsCollector()
         self.enabled = True
 
-    def start_trace(self, trace_id: Optional[str] = None) -> str:
+    def start_trace(self, trace_id: str | None = None) -> str:
         """Start a new trace."""
         return self.tracer.start_trace(trace_id)
 
     def start_span(
         self,
         name: str,
-        parent_id: Optional[str] = None,
-        tags: Optional[Dict[str, Any]] = None
+        parent_id: str | None = None,
+        tags: dict[str, Any] | None = None
     ) -> Span:
         """Start a new span."""
         return self.tracer.start_span(name, parent_id, tags)
@@ -345,30 +345,30 @@ class ObservabilityManager:
         """Finish a span."""
         return self.tracer.finish_span(span)
 
-    def counter(self, name: str, value: float = 1.0, tags: Optional[Dict[str, str]] = None) -> None:
+    def counter(self, name: str, value: float = 1.0, tags: dict[str, str] | None = None) -> None:
         """Record a counter metric."""
         if self.enabled:
             self.metrics.counter(name, value, tags)
 
-    def gauge(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
+    def gauge(self, name: str, value: float, tags: dict[str, str] | None = None) -> None:
         """Record a gauge metric."""
         if self.enabled:
             self.metrics.gauge(name, value, tags)
 
-    def histogram(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
+    def histogram(self, name: str, value: float, tags: dict[str, str] | None = None) -> None:
         """Record a histogram metric."""
         if self.enabled:
             self.metrics.histogram(name, value, tags)
 
-    def timer(self, name: str, tags: Optional[Dict[str, str]] = None) -> Timer:
+    def timer(self, name: str, tags: dict[str, str] | None = None) -> Timer:
         """Create a timer metric."""
         return self.metrics.timer(name, tags)
 
-    def get_trace(self) -> List[Span]:
+    def get_trace(self) -> list[Span]:
         """Get the current trace."""
         return self.tracer.get_trace()
 
-    def get_metrics(self) -> List[Metric]:
+    def get_metrics(self) -> list[Metric]:
         """Get all metrics."""
         return self.metrics.get_metrics()
 
@@ -405,7 +405,7 @@ def get_observability() -> ObservabilityManager:
 
 # Context managers for easy usage
 @contextmanager
-def span(name: str, tags: Optional[Dict[str, Any]] = None):
+def span(name: str, tags: dict[str, Any] | None = None):
     """Context manager for creating a span."""
     obs = get_observability()
     span_obj = obs.start_span(name, tags=tags)
@@ -416,7 +416,7 @@ def span(name: str, tags: Optional[Dict[str, Any]] = None):
 
 
 @asynccontextmanager
-async def async_span(name: str, tags: Optional[Dict[str, Any]] = None) -> AsyncGenerator[Span, None]:
+async def async_span(name: str, tags: dict[str, Any] | None = None) -> AsyncGenerator[Span, None]:
     """Async context manager for creating a span."""
     obs = get_observability()
     span_obj = obs.start_span(name, tags=tags)
@@ -427,7 +427,7 @@ async def async_span(name: str, tags: Optional[Dict[str, Any]] = None) -> AsyncG
 
 
 @contextmanager
-def timer(name: str, tags: Optional[Dict[str, str]] = None):
+def timer(name: str, tags: dict[str, str] | None = None):
     """Context manager for timing operations."""
     obs = get_observability()
     with obs.timer(name, tags) as timer_obj:
@@ -435,7 +435,7 @@ def timer(name: str, tags: Optional[Dict[str, str]] = None):
 
 
 @asynccontextmanager
-async def async_timer(name: str, tags: Optional[Dict[str, str]] = None) -> AsyncGenerator[Timer, None]:
+async def async_timer(name: str, tags: dict[str, str] | None = None) -> AsyncGenerator[Timer, None]:
     """Async context manager for timing operations."""
     obs = get_observability()
     async with obs.timer(name, tags) as timer_obj:
@@ -443,7 +443,7 @@ async def async_timer(name: str, tags: Optional[Dict[str, str]] = None) -> Async
 
 
 # Convenience functions
-def trace(name: str, tags: Optional[Dict[str, Any]] = None):
+def trace(name: str, tags: dict[str, Any] | None = None):
     """Decorator for tracing functions."""
     def decorator(func):
         if asyncio.iscoroutinefunction(func):
@@ -459,7 +459,7 @@ def trace(name: str, tags: Optional[Dict[str, Any]] = None):
     return decorator
 
 
-def measure(name: str, tags: Optional[Dict[str, str]] = None):
+def measure(name: str, tags: dict[str, str] | None = None):
     """Decorator for measuring function execution time."""
     def decorator(func):
         if asyncio.iscoroutinefunction(func):

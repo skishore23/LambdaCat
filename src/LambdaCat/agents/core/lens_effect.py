@@ -12,13 +12,13 @@ B = TypeVar("B")  # Sub-state
 
 def with_lens(effect: Effect[A, A], lens: Lens[S, A]) -> Effect[S, S]:
     """Apply a lens to an effect for focused state manipulation.
-    
+
     This is the functorial mapping of lenses over effects:
     Lens[S, A] -> Effect[A, A] -> Effect[S, S]
-    
+
     Laws:
     - get-put: lens.get(lens.set(a, s)) = a
-    - put-get: lens.set(lens.get(s), s) = s  
+    - put-get: lens.set(lens.get(s), s) = s
     - put-put: lens.set(a2, lens.set(a1, s)) = lens.set(a2, s)
     """
 
@@ -45,7 +45,7 @@ def compose_lens_effects(
     effect: Effect[B, B]
 ) -> Effect[S, S]:
     """Compose lens effects: outer_lens . inner_lens . effect.
-    
+
     This preserves lens composition laws:
     (f . g) . h = f . (g . h)
     """
@@ -64,7 +64,7 @@ def compose_lens_effects(
 
 def lens_map(f: Callable[[A], B], lens: Lens[S, A]) -> Effect[S, S]:
     """Map a function over a lens focus.
-    
+
     This creates an effect that applies f to the focused sub-state.
     """
 
@@ -80,7 +80,7 @@ def lens_map(f: Callable[[A], B], lens: Lens[S, A]) -> Effect[S, S]:
 
 def lens_modify(f: Callable[[A], A], lens: Lens[S, A]) -> Effect[S, S]:
     """Modify a lens focus with a function.
-    
+
     This creates an effect that modifies the focused sub-state.
     """
 
@@ -96,7 +96,7 @@ def lens_modify(f: Callable[[A], A], lens: Lens[S, A]) -> Effect[S, S]:
 
 def lens_gets(f: Callable[[A], B], lens: Lens[S, A]) -> Effect[S, B]:
     """Get a value from a lens focus.
-    
+
     This creates an effect that extracts a value from the focused sub-state.
     """
 
@@ -111,7 +111,7 @@ def lens_gets(f: Callable[[A], B], lens: Lens[S, A]) -> Effect[S, B]:
 
 def lens_put(value: A, lens: Lens[S, A]) -> Effect[S, S]:
     """Put a value into a lens focus.
-    
+
     This creates an effect that sets the focused sub-state to a value.
     """
 
@@ -126,7 +126,7 @@ def lens_put(value: A, lens: Lens[S, A]) -> Effect[S, S]:
 # Lens composition utilities
 def compose_lenses(outer: Lens[S, A], inner: Lens[A, B]) -> Lens[S, B]:
     """Compose two lenses: outer . inner.
-    
+
     This preserves lens composition laws.
     """
     return Lens(
@@ -211,8 +211,8 @@ def dict_lens(key: str) -> Lens[dict[str, Any], Any]:
 def list_lens(index: int) -> Lens[list[Any], Any]:
     """Lens for list access."""
     return Lens(
-        get=lambda l: l[index] if index < len(l) else None,
-        set=lambda l, value: [value if i == index else l[i] for i in range(len(l))]
+        get=lambda lst: lst[index] if index < len(lst) else None,
+        set=lambda lst, value: [value if i == index else lst[i] for i in range(len(lst))]
     )
 
 
@@ -246,7 +246,7 @@ def focus_effect(
     effect: Effect[A, A]
 ) -> Effect[S, S]:
     """Focus an effect on a sub-state using a lens.
-    
+
     This is the main composition operator for lens + effect.
     """
     return with_lens(effect, lens)
@@ -263,7 +263,7 @@ def focus_sequence(
     # Compose effects sequentially
     composed = effects[0]
     for effect in effects[1:]:
-        composed = composed.bind(lambda _: effect)
+        composed = composed.bind(lambda _, eff=effect: eff)
 
     return focus_effect(lens, composed)
 
@@ -275,6 +275,7 @@ def focus_parallel(
 ) -> Effect[S, S]:
     """Focus parallel effects on a sub-state."""
     if not effects:
+        from ..effect import Effect
         return Effect.pure(lambda s: s)
 
     # Compose effects in parallel

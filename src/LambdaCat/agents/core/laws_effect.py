@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Callable, Dict, List, TypeVar
+from typing import Any, Callable, TypeVar
 
 import pytest
 from hypothesis import given
@@ -58,10 +58,11 @@ class TestEffectMonadLaws:
 
     @pytest.mark.asyncio
     @given(state_strategy(), context_strategy())
-    async def test_left_identity(self, state: Dict[str, Any], ctx: Dict[str, Any]):
+    async def test_left_identity(self, state: dict[str, Any], ctx: dict[str, Any]):
         """Test left identity: pure(a) >>= f = f(a)"""
         a = "test_value"
-        f = lambda x: Effect.pure(f"processed_{x}")
+        def f(x):
+            return Effect.pure(f"processed_{x}")
 
         # pure(a) >>= f
         left_side = Effect.pure(a).bind(f)
@@ -75,7 +76,7 @@ class TestEffectMonadLaws:
 
     @pytest.mark.asyncio
     @given(state_strategy(), context_strategy())
-    async def test_right_identity(self, state: Dict[str, Any], ctx: Dict[str, Any]):
+    async def test_right_identity(self, state: dict[str, Any], ctx: dict[str, Any]):
         """Test right identity: m >>= pure = m"""
         # Create a test effect
         m = Effect.pure("test_value")
@@ -91,11 +92,13 @@ class TestEffectMonadLaws:
 
     @pytest.mark.asyncio
     @given(state_strategy(), context_strategy())
-    async def test_associativity(self, state: Dict[str, Any], ctx: Dict[str, Any]):
+    async def test_associativity(self, state: dict[str, Any], ctx: dict[str, Any]):
         """Test associativity: (m >>= f) >>= g = m >>= (λx. f(x) >>= g)"""
         m = Effect.pure("test_value")
-        f = lambda x: Effect.pure(f"f_{x}")
-        g = lambda x: Effect.pure(f"g_{x}")
+        def f(x):
+            return Effect.pure(f"f_{x}")
+        def g(x):
+            return Effect.pure(f"g_{x}")
 
         # (m >>= f) >>= g
         left_side = m.bind(f).bind(g)
@@ -114,7 +117,7 @@ class TestEffectFunctorLaws:
 
     @pytest.mark.asyncio
     @given(state_strategy(), context_strategy())
-    async def test_identity(self, state: Dict[str, Any], ctx: Dict[str, Any]):
+    async def test_identity(self, state: dict[str, Any], ctx: dict[str, Any]):
         """Test identity: fmap id = id"""
         m = Effect.pure("test_value")
 
@@ -129,11 +132,13 @@ class TestEffectFunctorLaws:
 
     @pytest.mark.asyncio
     @given(state_strategy(), context_strategy())
-    async def test_composition(self, state: Dict[str, Any], ctx: Dict[str, Any]):
+    async def test_composition(self, state: dict[str, Any], ctx: dict[str, Any]):
         """Test composition: fmap (f . g) = fmap f . fmap g"""
         m = Effect.pure("test_value")
-        f = lambda x: f"f_{x}"
-        g = lambda x: f"g_{x}"
+        def f(x):
+            return f"f_{x}"
+        def g(x):
+            return f"g_{x}"
 
         # fmap (f . g)
         left_side = m.map(lambda x: f(g(x)))
@@ -152,7 +157,7 @@ class TestEffectApplicativeLaws:
 
     @pytest.mark.asyncio
     @given(state_strategy(), context_strategy())
-    async def test_identity(self, state: Dict[str, Any], ctx: Dict[str, Any]):
+    async def test_identity(self, state: dict[str, Any], ctx: dict[str, Any]):
         """Test identity: pure id <*> v = v"""
         v = Effect.pure("test_value")
 
@@ -167,9 +172,10 @@ class TestEffectApplicativeLaws:
 
     @pytest.mark.asyncio
     @given(state_strategy(), context_strategy())
-    async def test_homomorphism(self, state: Dict[str, Any], ctx: Dict[str, Any]):
+    async def test_homomorphism(self, state: dict[str, Any], ctx: dict[str, Any]):
         """Test homomorphism: pure f <*> pure x = pure (f x)"""
-        f = lambda x: f"processed_{x}"
+        def f(x):
+            return f"processed_{x}"
         x = "test_value"
 
         # pure f <*> pure x
@@ -184,7 +190,7 @@ class TestEffectApplicativeLaws:
 
     @pytest.mark.asyncio
     @given(state_strategy(), context_strategy())
-    async def test_interchange(self, state: Dict[str, Any], ctx: Dict[str, Any]):
+    async def test_interchange(self, state: dict[str, Any], ctx: dict[str, Any]):
         """Test interchange: u <*> pure y = pure ($ y) <*> u"""
         u = Effect.pure(lambda x: f"processed_{x}")
         y = "test_value"
@@ -201,14 +207,15 @@ class TestEffectApplicativeLaws:
 
     @pytest.mark.asyncio
     @given(state_strategy(), context_strategy())
-    async def test_composition(self, state: Dict[str, Any], ctx: Dict[str, Any]):
+    async def test_composition(self, state: dict[str, Any], ctx: dict[str, Any]):
         """Test composition: pure (.) <*> u <*> v <*> w = u <*> (v <*> w)"""
         u = Effect.pure(lambda x: f"u_{x}")
         v = Effect.pure(lambda x: f"v_{x}")
         w = Effect.pure("test_value")
 
         # pure (.) <*> u <*> v <*> w
-        compose = lambda f: lambda g: lambda x: f(g(x))
+        def compose(f):
+            return lambda g: lambda x: f(g(x))
         left_side = Effect.pure(compose).ap(u).ap(v).ap(w)
         left_result = await left_side.run(state, ctx)
 
@@ -225,7 +232,7 @@ class TestEffectParallelComposition:
 
     @pytest.mark.asyncio
     @given(state_strategy(), context_strategy())
-    async def test_parallel_identity(self, state: Dict[str, Any], ctx: Dict[str, Any]):
+    async def test_parallel_identity(self, state: dict[str, Any], ctx: dict[str, Any]):
         """Test parallel composition with single effect."""
         effect = Effect.pure("test_value")
 
@@ -236,7 +243,7 @@ class TestEffectParallelComposition:
 
     @pytest.mark.asyncio
     @given(state_strategy(), context_strategy())
-    async def test_parallel_empty(self, state: Dict[str, Any], ctx: Dict[str, Any]):
+    async def test_parallel_empty(self, state: dict[str, Any], ctx: dict[str, Any]):
         """Test parallel composition with no effects."""
         result = await Effect.par_mapN(patch_combine).run(state, ctx)
 
@@ -245,7 +252,7 @@ class TestEffectParallelComposition:
 
     @pytest.mark.asyncio
     @given(state_strategy(), context_strategy())
-    async def test_parallel_error_propagation(self, state: Dict[str, Any], ctx: Dict[str, Any]):
+    async def test_parallel_error_propagation(self, state: dict[str, Any], ctx: dict[str, Any]):
         """Test that errors in parallel composition are propagated."""
         error_effect = Effect(lambda s, ctx: (s, [], Err("test_error")))
         success_effect = Effect.pure("success")
@@ -258,10 +265,10 @@ class TestEffectParallelComposition:
 
     @pytest.mark.asyncio
     @given(state_strategy(), context_strategy())
-    async def test_parallel_state_merging(self, state: Dict[str, Any], ctx: Dict[str, Any]):
+    async def test_parallel_state_merging(self, state: dict[str, Any], ctx: dict[str, Any]):
         """Test that parallel effects merge state correctly."""
-        def create_effect(key: str, value: str) -> Effect[Dict[str, Any], str]:
-            async def effect_fn(s: Dict[str, Any], ctx: Dict[str, Any]) -> tuple[Dict[str, Any], List[Dict[str, Any]], Result[str]]:
+        def create_effect(key: str, value: str) -> Effect[dict[str, Any], str]:
+            async def effect_fn(s: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], Result[str]]:
                 new_state = dict(s)
                 new_state[key] = value
                 return (new_state, [], Ok(value))
@@ -285,7 +292,7 @@ class TestEffectRaceLaws:
 
     @pytest.mark.asyncio
     @given(state_strategy(), context_strategy())
-    async def test_race_identity(self, state: Dict[str, Any], ctx: Dict[str, Any]):
+    async def test_race_identity(self, state: dict[str, Any], ctx: dict[str, Any]):
         """Test race with single effect."""
         effect = Effect.pure("test_value")
 
@@ -296,21 +303,21 @@ class TestEffectRaceLaws:
 
     @pytest.mark.asyncio
     @given(state_strategy(), context_strategy())
-    async def test_race_empty(self, state: Dict[str, Any], ctx: Dict[str, Any]):
+    async def test_race_empty(self, state: dict[str, Any], ctx: dict[str, Any]):
         """Test race with no effects."""
         with pytest.raises(ValueError):
             await Effect.race_first().run(state, ctx)
 
     @pytest.mark.asyncio
     @given(state_strategy(), context_strategy())
-    async def test_race_first_success(self, state: Dict[str, Any], ctx: Dict[str, Any]):
+    async def test_race_first_success(self, state: dict[str, Any], ctx: dict[str, Any]):
         """Test that race returns first successful result."""
         # Create effects with different delays
-        async def slow_effect(s: Dict[str, Any], ctx: Dict[str, Any]) -> tuple[Dict[str, Any], List[Dict[str, Any]], Result[str]]:
+        async def slow_effect(s: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], Result[str]]:
             await asyncio.sleep(0.1)
             return (s, [], Ok("slow"))
 
-        async def fast_effect(s: Dict[str, Any], ctx: Dict[str, Any]) -> tuple[Dict[str, Any], List[Dict[str, Any]], Result[str]]:
+        async def fast_effect(s: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], Result[str]]:
             await asyncio.sleep(0.01)
             return (s, [], Ok("fast"))
 
@@ -329,7 +336,7 @@ class TestEffectTimeout:
 
     @pytest.mark.asyncio
     @given(state_strategy(), context_strategy())
-    async def test_timeout_success(self, state: Dict[str, Any], ctx: Dict[str, Any]):
+    async def test_timeout_success(self, state: dict[str, Any], ctx: dict[str, Any]):
         """Test timeout with successful effect."""
         effect = Effect.pure("success")
         timeout_effect = Effect.timeout(1.0, effect)
@@ -340,9 +347,9 @@ class TestEffectTimeout:
 
     @pytest.mark.asyncio
     @given(state_strategy(), context_strategy())
-    async def test_timeout_failure(self, state: Dict[str, Any], ctx: Dict[str, Any]):
+    async def test_timeout_failure(self, state: dict[str, Any], ctx: dict[str, Any]):
         """Test timeout with slow effect."""
-        async def slow_effect(s: Dict[str, Any], ctx: Dict[str, Any]) -> tuple[Dict[str, Any], List[Dict[str, Any]], Result[str]]:
+        async def slow_effect(s: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], Result[str]]:
             await asyncio.sleep(0.1)
             return (s, [], Ok("slow"))
 
@@ -367,8 +374,8 @@ class TestEffectIntegration:
         ctx = {}
 
         # Create a sequence of effects
-        def step_effect(step_name: str) -> Effect[Dict[str, Any], str]:
-            async def effect_fn(s: Dict[str, Any], ctx: Dict[str, Any]) -> tuple[Dict[str, Any], List[Dict[str, Any]], Result[str]]:
+        def step_effect(step_name: str) -> Effect[dict[str, Any], str]:
+            async def effect_fn(s: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], Result[str]]:
                 new_state = dict(s)
                 new_state["step"] += 1
                 new_state["data"].append(step_name)
@@ -403,8 +410,8 @@ class TestEffectIntegration:
         state = {"results": []}
         ctx = {}
 
-        def parallel_effect(name: str) -> Effect[Dict[str, Any], str]:
-            async def effect_fn(s: Dict[str, Any], ctx: Dict[str, Any]) -> tuple[Dict[str, Any], List[Dict[str, Any]], Result[str]]:
+        def parallel_effect(name: str) -> Effect[dict[str, Any], str]:
+            async def effect_fn(s: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], Result[str]]:
                 new_state = dict(s)
                 new_state["results"].append(name)
                 return (new_state, [{"span": name}], Ok(name))
@@ -439,8 +446,8 @@ class TestEffectProperties:
         self,
         value1: str,
         value2: str,
-        state: Dict[str, Any],
-        ctx: Dict[str, Any]
+        state: dict[str, Any],
+        ctx: dict[str, Any]
     ):
         """Test properties of pure effects."""
         effect1 = Effect.pure(value1)
@@ -466,8 +473,8 @@ class TestEffectProperties:
         self,
         value: str,
         f: Callable[[str], str],
-        state: Dict[str, Any],
-        ctx: Dict[str, Any]
+        state: dict[str, Any],
+        ctx: dict[str, Any]
     ):
         """Test properties of effect mapping."""
         effect = Effect.pure(value)
@@ -488,9 +495,9 @@ class TestEffectProperties:
     async def test_effect_bind_properties(
         self,
         value: str,
-        f: Callable[[str], Effect[Dict[str, Any], str]],
-        state: Dict[str, Any],
-        ctx: Dict[str, Any]
+        f: Callable[[str], Effect[dict[str, Any], str]],
+        state: dict[str, Any],
+        ctx: dict[str, Any]
     ):
         """Test properties of effect binding."""
         effect = Effect.pure(value)

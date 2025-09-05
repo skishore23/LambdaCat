@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Generic, List, TypeVar
+from typing import Any, Callable, Generic, TypeVar
 
 from .beliefs import BeliefSystem
 
@@ -18,9 +18,9 @@ class EvaluationResult(Generic[S]):
     score: float
     confidence: float
     reasoning: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "score": self.score,
@@ -34,12 +34,12 @@ class Policy(ABC, Generic[S, A]):
     """Abstract base class for agent policies."""
 
     @abstractmethod
-    def evaluate(self, state: S, action: A, context: Dict[str, Any]) -> EvaluationResult[S]:
+    def evaluate(self, state: S, action: A, context: dict[str, Any]) -> EvaluationResult[S]:
         """Evaluate an action given a state."""
         pass
 
     @abstractmethod
-    def select_action(self, state: S, available_actions: List[A], context: Dict[str, Any]) -> A:
+    def select_action(self, state: S, available_actions: list[A], context: dict[str, Any]) -> A:
         """Select the best action from available options."""
         pass
 
@@ -48,7 +48,7 @@ class UtilityModel(ABC, Generic[S]):
     """Abstract base class for utility models."""
 
     @abstractmethod
-    def compute_utility(self, state: S, context: Dict[str, Any]) -> float:
+    def compute_utility(self, state: S, context: dict[str, Any]) -> float:
         """Compute utility of a state."""
         pass
 
@@ -60,7 +60,7 @@ class BeliefBasedPolicy(Policy[S, A]):
         self.belief_system = belief_system
         self.utility_model = utility_model
 
-    def evaluate(self, state: S, action: A, context: Dict[str, Any]) -> EvaluationResult[S]:
+    def evaluate(self, state: S, action: A, context: dict[str, Any]) -> EvaluationResult[S]:
         """Evaluate action based on beliefs and utility."""
         # Get relevant beliefs
         action_key = f"action_{action}_good"
@@ -90,7 +90,7 @@ class BeliefBasedPolicy(Policy[S, A]):
             }
         )
 
-    def select_action(self, state: S, available_actions: List[A], context: Dict[str, Any]) -> A:
+    def select_action(self, state: S, available_actions: list[A], context: dict[str, Any]) -> A:
         """Select action with highest evaluation score."""
         if not available_actions:
             raise ValueError("No actions available")
@@ -109,10 +109,10 @@ class BeliefBasedPolicy(Policy[S, A]):
 class SimpleUtilityModel(UtilityModel[S]):
     """Simple utility model based on state properties."""
 
-    def __init__(self, utility_functions: Dict[str, Callable[[S], float]]):
+    def __init__(self, utility_functions: dict[str, Callable[[S], float]]):
         self.utility_functions = utility_functions
 
-    def compute_utility(self, state: S, context: Dict[str, Any]) -> float:
+    def compute_utility(self, state: S, context: dict[str, Any]) -> float:
         """Compute utility as weighted sum of utility functions."""
         total_utility = 0.0
         total_weight = 0.0
@@ -135,13 +135,13 @@ class RewardBasedPolicy(Policy[S, A]):
     def __init__(self, learning_rate: float = 0.1, discount_factor: float = 0.9):
         self.learning_rate = learning_rate
         self.discount_factor = discount_factor
-        self.action_values: Dict[str, float] = {}
+        self.action_values: dict[str, float] = {}
 
     def get_action_key(self, state: S, action: A) -> str:
         """Generate key for action-value lookup."""
         return f"{state}_{action}"
 
-    def evaluate(self, state: S, action: A, context: Dict[str, Any]) -> EvaluationResult[S]:
+    def evaluate(self, state: S, action: A, context: dict[str, Any]) -> EvaluationResult[S]:
         """Evaluate action based on learned values."""
         action_key = self.get_action_key(state, action)
         value = self.action_values.get(action_key, 0.0)
@@ -159,7 +159,7 @@ class RewardBasedPolicy(Policy[S, A]):
             }
         )
 
-    def select_action(self, state: S, available_actions: List[A], context: Dict[str, Any]) -> A:
+    def select_action(self, state: S, available_actions: list[A], context: dict[str, Any]) -> A:
         """Select action with highest learned value."""
         if not available_actions:
             raise ValueError("No actions available")
@@ -203,11 +203,11 @@ class EpsilonGreedyPolicy(Policy[S, A]):
         self.base_policy = base_policy
         self.epsilon = epsilon
 
-    def evaluate(self, state: S, action: A, context: Dict[str, Any]) -> EvaluationResult[S]:
+    def evaluate(self, state: S, action: A, context: dict[str, Any]) -> EvaluationResult[S]:
         """Evaluate using base policy."""
         return self.base_policy.evaluate(state, action, context)
 
-    def select_action(self, state: S, available_actions: List[A], context: Dict[str, Any]) -> A:
+    def select_action(self, state: S, available_actions: list[A], context: dict[str, Any]) -> A:
         """Select action with epsilon-greedy strategy."""
         import random
 
@@ -222,14 +222,14 @@ class EpsilonGreedyPolicy(Policy[S, A]):
 class MultiObjectivePolicy(Policy[S, A]):
     """Policy that optimizes multiple objectives."""
 
-    def __init__(self, objectives: List[Callable[[S, A], float]], weights: List[float] = None):
+    def __init__(self, objectives: list[Callable[[S, A], float]], weights: list[float] = None):
         self.objectives = objectives
         self.weights = weights or [1.0] * len(objectives)
 
         if len(self.weights) != len(self.objectives):
             raise ValueError("Number of weights must match number of objectives")
 
-    def evaluate(self, state: S, action: A, context: Dict[str, Any]) -> EvaluationResult[S]:
+    def evaluate(self, state: S, action: A, context: dict[str, Any]) -> EvaluationResult[S]:
         """Evaluate action across multiple objectives."""
         scores = []
         reasoning_parts = []
@@ -258,7 +258,7 @@ class MultiObjectivePolicy(Policy[S, A]):
             }
         )
 
-    def select_action(self, state: S, available_actions: List[A], context: Dict[str, Any]) -> A:
+    def select_action(self, state: S, available_actions: list[A], context: dict[str, Any]) -> A:
         """Select action with highest multi-objective score."""
         if not available_actions:
             raise ValueError("No actions available")
@@ -277,10 +277,10 @@ class MultiObjectivePolicy(Policy[S, A]):
 # Policy evaluation utilities
 def evaluate_policy_performance(
     policy: Policy[S, A],
-    test_states: List[S],
-    test_actions: List[List[A]],
-    context: Dict[str, Any] = None
-) -> Dict[str, float]:
+    test_states: list[S],
+    test_actions: list[list[A]],
+    context: dict[str, Any] = None
+) -> dict[str, float]:
     """Evaluate policy performance on test data."""
     if context is None:
         context = {}
@@ -324,7 +324,7 @@ def evaluate_policy_performance(
 # Factory functions
 def create_belief_based_policy(
     belief_system: BeliefSystem[S],
-    utility_functions: Dict[str, Callable[[S], float]]
+    utility_functions: dict[str, Callable[[S], float]]
 ) -> BeliefBasedPolicy[S, A]:
     """Create a belief-based policy."""
     utility_model = SimpleUtilityModel(utility_functions)
@@ -340,8 +340,8 @@ def create_reward_based_policy(
 
 
 def create_multi_objective_policy(
-    objectives: List[Callable[[S, A], float]],
-    weights: List[float] = None
+    objectives: list[Callable[[S, A], float]],
+    weights: list[float] = None
 ) -> MultiObjectivePolicy[S, A]:
     """Create a multi-objective policy."""
     return MultiObjectivePolicy(objectives, weights)

@@ -6,7 +6,7 @@ import time
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..core.effect import Effect, with_trace
 from ..core.instruments import get_observability
@@ -22,14 +22,14 @@ class LLMConfig:
     top_p: float = 1.0
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0
-    stop: Optional[List[str]] = None
+    stop: list[str] | None = None
     timeout: float = 30.0
     max_retries: int = 3
     retry_delay: float = 1.0
     retry_jitter: float = 0.1
     # Budget tracking
-    max_tokens_budget: Optional[int] = None
-    max_cost_budget: Optional[float] = None
+    max_tokens_budget: int | None = None
+    max_cost_budget: float | None = None
     cost_per_token: float = 0.0001  # Default cost per token
 
 
@@ -39,17 +39,17 @@ class LLMResponse:
 
     content: str
     model: str
-    usage: Dict[str, int]
+    usage: dict[str, int]
     finish_reason: str
     response_time_ms: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "content": self.content,
             "model": self.model,
             "usage": self.usage,
-            "finish_reason": finish_reason,
+            "finish_reason": self.finish_reason,
             "response_time_ms": self.response_time_ms
         }
 
@@ -57,7 +57,7 @@ class LLMResponse:
 class RateLimiter:
     """Token bucket rate limiter for LLM calls."""
 
-    def __init__(self, rate_per_second: float, burst_size: Optional[int] = None):
+    def __init__(self, rate_per_second: float, burst_size: int | None = None):
         self.rate = rate_per_second
         self.burst_size = burst_size or int(rate_per_second * 2)
         self.tokens = self.burst_size
@@ -96,7 +96,7 @@ class CircuitBreaker:
         self.recovery_timeout = recovery_timeout
         self.expected_exception = expected_exception
         self.failure_count = 0
-        self.last_failure_time: Optional[float] = None
+        self.last_failure_time: float | None = None
         self.state = "closed"  # closed, open, half_open
 
     async def call(self, func, *args, **kwargs):
@@ -147,9 +147,9 @@ class LLMClient(ABC):
     @abstractmethod
     async def batch_complete(
         self,
-        prompts: List[str],
+        prompts: list[str],
         config: LLMConfig
-    ) -> List[LLMResponse]:
+    ) -> list[LLMResponse]:
         """Complete multiple prompts in batch."""
         pass
 
@@ -157,7 +157,7 @@ class LLMClient(ABC):
 class MockLLMClient(LLMClient):
     """Mock LLM client for testing."""
 
-    def __init__(self, responses: Optional[List[str]] = None):
+    def __init__(self, responses: list[str] | None = None):
         self.responses = responses or ["This is a mock response."]
         self.call_count = 0
 
@@ -195,9 +195,9 @@ class MockLLMClient(LLMClient):
 
     async def batch_complete(
         self,
-        prompts: List[str],
+        prompts: list[str],
         config: LLMConfig
-    ) -> List[LLMResponse]:
+    ) -> list[LLMResponse]:
         """Mock batch completion."""
         responses = []
         for prompt in prompts:
@@ -209,15 +209,15 @@ class MockLLMClient(LLMClient):
 class OpenAILLMClient(LLMClient):
     """OpenAI LLM client."""
 
-    def __init__(self, api_key: str, base_url: Optional[str] = None):
+    def __init__(self, api_key: str, base_url: str | None = None):
         try:
             import openai
             self.client = openai.AsyncOpenAI(
                 api_key=api_key,
                 base_url=base_url
             )
-        except ImportError:
-            raise ImportError("OpenAI client requires openai package: pip install openai")
+        except ImportError as e:
+            raise ImportError("OpenAI client requires openai package: pip install openai") from e
 
     async def complete(
         self,
@@ -253,7 +253,7 @@ class OpenAILLMClient(LLMClient):
                 response_time_ms=response_time_ms
             )
         except Exception as e:
-            raise Exception(f"OpenAI API error: {e}")
+            raise Exception(f"OpenAI API error: {e}") from e
 
     async def stream(
         self,
@@ -278,13 +278,13 @@ class OpenAILLMClient(LLMClient):
                 if chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
         except Exception as e:
-            raise Exception(f"OpenAI streaming error: {e}")
+            raise Exception(f"OpenAI streaming error: {e}") from e
 
     async def batch_complete(
         self,
-        prompts: List[str],
+        prompts: list[str],
         config: LLMConfig
-    ) -> List[LLMResponse]:
+    ) -> list[LLMResponse]:
         """Complete multiple prompts in batch using OpenAI API."""
         start_time = time.perf_counter()
 
@@ -318,7 +318,7 @@ class OpenAILLMClient(LLMClient):
             await asyncio.sleep(1.0)  # Simulate batch processing time
 
             # Retrieve batch results
-            batch_result = await self.client.batches.retrieve(batch_response.id)
+            _batch_result = await self.client.batches.retrieve(batch_response.id)
 
             responses = []
             for _i, prompt in enumerate(prompts):
@@ -357,8 +357,8 @@ class LLMAdapter:
         self,
         client: LLMClient,
         config: LLMConfig,
-        rate_limiter: Optional[RateLimiter] = None,
-        circuit_breaker: Optional[CircuitBreaker] = None
+        rate_limiter: RateLimiter | None = None,
+        circuit_breaker: CircuitBreaker | None = None
     ):
         self.client = client
         self.config = config
@@ -372,7 +372,7 @@ class LLMAdapter:
     async def complete(
         self,
         prompt: str,
-        config_override: Optional[LLMConfig] = None
+        config_override: LLMConfig | None = None
     ) -> LLMResponse:
         """Complete a prompt with retries, rate limiting, and budget tracking."""
         config = config_override or self.config
@@ -422,7 +422,7 @@ class LLMAdapter:
 
         return await _complete_with_retries()
 
-    def get_budget_status(self) -> Dict[str, Any]:
+    def get_budget_status(self) -> dict[str, Any]:
         """Get current budget status."""
         return {
             "total_tokens_used": self.total_tokens_used,
@@ -442,7 +442,7 @@ class LLMAdapter:
     async def stream(
         self,
         prompt: str,
-        config_override: Optional[LLMConfig] = None
+        config_override: LLMConfig | None = None
     ) -> AsyncGenerator[str, None]:
         """Stream completion with rate limiting."""
         config = config_override or self.config
@@ -459,9 +459,9 @@ class LLMAdapter:
 
     async def batch_complete(
         self,
-        prompts: List[str],
-        config_override: Optional[LLMConfig] = None
-    ) -> List[LLMResponse]:
+        prompts: list[str],
+        config_override: LLMConfig | None = None
+    ) -> list[LLMResponse]:
         """Complete multiple prompts in batch with rate limiting."""
         config = config_override or self.config
 
@@ -511,11 +511,11 @@ class LLMAdapter:
         self,
         prompt_key: str = "prompt",
         response_key: str = "response",
-        config_override: Optional[LLMConfig] = None
-    ) -> Effect[Dict[str, Any], Dict[str, Any]]:
+        config_override: LLMConfig | None = None
+    ) -> Effect[dict[str, Any], dict[str, Any]]:
         """Create an Effect for LLM completion."""
 
-        async def llm_effect(state: Dict[str, Any], ctx: Dict[str, Any]) -> tuple[Dict[str, Any], List[Dict[str, Any]], Any]:
+        async def llm_effect(state: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], Any]:
             try:
                 prompt = state.get(prompt_key, "")
                 if not prompt:
@@ -538,8 +538,8 @@ class LLMAdapter:
 
 # Factory functions
 def create_mock_llm(
-    responses: Optional[List[str]] = None,
-    config: Optional[LLMConfig] = None
+    responses: list[str] | None = None,
+    config: LLMConfig | None = None
 ) -> LLMAdapter:
     """Create a mock LLM adapter for testing."""
     client = MockLLMClient(responses)
@@ -549,7 +549,7 @@ def create_mock_llm(
 
 def create_openai_llm(
     api_key: str,
-    config: Optional[LLMConfig] = None,
+    config: LLMConfig | None = None,
     rate_per_second: float = 3.0
 ) -> LLMAdapter:
     """Create an OpenAI LLM adapter."""
@@ -563,11 +563,11 @@ def create_openai_llm(
 def ask_llm(
     prompt: str,
     llm: LLMAdapter,
-    config_override: Optional[LLMConfig] = None
-) -> Effect[Dict[str, Any], str]:
+    config_override: LLMConfig | None = None
+    ) -> Effect[dict[str, Any], str]:
     """Create an Effect that asks the LLM a question."""
 
-    async def ask_effect(state: Dict[str, Any], ctx: Dict[str, Any]) -> tuple[Dict[str, Any], List[Dict[str, Any]], Any]:
+    async def ask_effect(state: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], Any]:
         try:
             response = await llm.complete(prompt, config_override)
             return (state, [], {"success": True, "answer": response.content})
@@ -580,11 +580,11 @@ def ask_llm(
 def stream_llm(
     prompt: str,
     llm: LLMAdapter,
-    config_override: Optional[LLMConfig] = None
-) -> Effect[Dict[str, Any], List[str]]:
+    config_override: LLMConfig | None = None
+    ) -> Effect[dict[str, Any], list[str]]:
     """Create an Effect that streams from the LLM."""
 
-    async def stream_effect(state: Dict[str, Any], ctx: Dict[str, Any]) -> tuple[Dict[str, Any], List[Dict[str, Any]], Any]:
+    async def stream_effect(state: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], Any]:
         try:
             chunks = []
             async for chunk in llm.stream(prompt, config_override):

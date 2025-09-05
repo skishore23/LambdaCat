@@ -4,7 +4,7 @@ import asyncio
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict, Generic, List, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 from uuid import uuid4
 
 T = TypeVar("T")  # Message type
@@ -19,8 +19,8 @@ class Message(Generic[T]):
     payload: T
     sender: str
     timestamp: float
-    reply_to: Optional[str] = None
-    correlation_id: Optional[str] = None
+    reply_to: str | None = None
+    correlation_id: str | None = None
 
     @classmethod
     def create(
@@ -28,8 +28,8 @@ class Message(Generic[T]):
         topic: str,
         payload: T,
         sender: str,
-        reply_to: Optional[str] = None,
-        correlation_id: Optional[str] = None
+        reply_to: str | None = None,
+        correlation_id: str | None = None
     ) -> Message[T]:
         """Create a new message."""
         import time
@@ -55,7 +55,7 @@ class MessageHandler(ABC, Generic[T]):
 
 class MessageBus:
     """Asynchronous message bus for multi-agent communication.
-    
+
     Supports:
     - Topic-based pub/sub
     - Point-to-point messaging
@@ -66,11 +66,11 @@ class MessageBus:
 
     def __init__(self, max_queue_size: int = 1000):
         self.max_queue_size = max_queue_size
-        self.topics: Dict[str, List[asyncio.Queue[Message[Any]]]] = defaultdict(list)
-        self.handlers: Dict[str, List[MessageHandler[Any]]] = defaultdict(list)
-        self.agent_queues: Dict[str, asyncio.Queue[Message[Any]]] = {}
+        self.topics: dict[str, list[asyncio.Queue[Message[Any]]]] = defaultdict(list)
+        self.handlers: dict[str, list[MessageHandler[Any]]] = defaultdict(list)
+        self.agent_queues: dict[str, asyncio.Queue[Message[Any]]] = {}
         self.running = False
-        self._tasks: List[asyncio.Task[None]] = []
+        self._tasks: list[asyncio.Task[None]] = []
 
     async def start(self) -> None:
         """Start the message bus."""
@@ -196,14 +196,14 @@ class RequestReplyBus(MessageBus):
     def __init__(self, max_queue_size: int = 1000, reply_timeout: float = 30.0):
         super().__init__(max_queue_size)
         self.reply_timeout = reply_timeout
-        self.pending_replies: Dict[str, asyncio.Future[Message[Any]]] = {}
+        self.pending_replies: dict[str, asyncio.Future[Message[Any]]] = {}
 
     async def request(
         self,
         topic: str,
         payload: Any,
         sender: str,
-        timeout: Optional[float] = None
+        timeout: float | None = None
     ) -> Message[Any]:
         """Send a request and wait for a reply."""
         correlation_id = str(uuid4())
@@ -271,7 +271,7 @@ class AgentCommunicator:
     def __init__(self, agent_id: str, bus: MessageBus):
         self.agent_id = agent_id
         self.bus = bus
-        self._queue: Optional[asyncio.Queue[Message[Any]]] = None
+        self._queue: asyncio.Queue[Message[Any]] | None = None
 
     async def get_inbox(self) -> asyncio.Queue[Message[Any]]:
         """Get the agent's inbox queue."""
@@ -283,7 +283,7 @@ class AgentCommunicator:
         self,
         topic: str,
         payload: Any,
-        reply_to: Optional[str] = None
+        reply_to: str | None = None
     ) -> None:
         """Send a message to a topic."""
         message = Message.create(
@@ -298,7 +298,7 @@ class AgentCommunicator:
         self,
         target_agent: str,
         payload: Any,
-        reply_to: Optional[str] = None
+        reply_to: str | None = None
     ) -> None:
         """Send a message directly to another agent."""
         message = Message.create(
@@ -313,7 +313,7 @@ class AgentCommunicator:
         self,
         topic: str,
         payload: Any,
-        timeout: Optional[float] = None
+        timeout: float | None = None
     ) -> Message[Any]:
         """Send a request and wait for reply."""
         if not isinstance(self.bus, RequestReplyBus):

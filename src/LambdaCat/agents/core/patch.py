@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Generic, TypeVar
+from typing import Any, Callable, Generic, TypeVar
 
 from ...core.fp.typeclasses import Monoid
 
@@ -11,12 +11,12 @@ S = TypeVar("S")  # State type
 @dataclass(frozen=True)
 class Patch(Generic[S]):
     """A monoidal patch for state updates.
-    
+
     Patches represent small, composable changes to state that can be
     safely merged in parallel without conflicts.
     """
 
-    updates: Dict[str, Any]
+    updates: dict[str, Any]
 
     @classmethod
     def empty(cls) -> Patch[S]:
@@ -25,7 +25,7 @@ class Patch(Generic[S]):
 
     def combine(self, other: Patch[S]) -> Patch[S]:
         """Associative combination of patches.
-        
+
         Left-biased merge: self takes precedence over other for conflicts.
         This ensures associativity: (a . b) . c = a . (b . c)
         """
@@ -61,7 +61,7 @@ def create_patch_from_state(new_state: S) -> Patch[S]:
     return Patch(dict(new_state))
 
 
-def create_patch_updates(updates: Dict[str, Any]) -> Patch[S]:
+def create_patch_updates(updates: dict[str, Any]) -> Patch[S]:
     """Create a patch with specific updates."""
     return Patch(updates)
 

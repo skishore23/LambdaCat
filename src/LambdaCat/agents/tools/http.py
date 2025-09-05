@@ -4,7 +4,7 @@ import asyncio
 import random
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 import aiohttp
 from aiohttp import ClientError, ClientTimeout
@@ -23,7 +23,7 @@ class HTTPConfig:
     retry_jitter: float = 0.1
     backoff_factor: float = 2.0
     max_redirects: int = 10
-    headers: Optional[Dict[str, str]] = None
+    headers: dict[str, str] | None = None
     verify_ssl: bool = True
     max_connections: int = 100
     max_keepalive_connections: int = 30
@@ -35,12 +35,12 @@ class HTTPResponse:
     """HTTP response wrapper."""
 
     status: int
-    headers: Dict[str, str]
+    headers: dict[str, str]
     content: str
     url: str
     response_time_ms: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "status": self.status,
@@ -56,8 +56,8 @@ class HTTPAdapter:
 
     def __init__(
         self,
-        config: Optional[HTTPConfig] = None,
-        session: Optional[aiohttp.ClientSession] = None
+        config: HTTPConfig | None = None,
+        session: aiohttp.ClientSession | None = None
     ):
         self.config = config or HTTPConfig()
         self.session = session
@@ -94,8 +94,8 @@ class HTTPAdapter:
     async def get(
         self,
         url: str,
-        params: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None
     ) -> HTTPResponse:
         """Make a GET request."""
         return await self._request("GET", url, params=params, headers=headers)
@@ -103,9 +103,9 @@ class HTTPAdapter:
     async def post(
         self,
         url: str,
-        data: Optional[Union[str, Dict[str, Any]]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None
+        data: str | dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None
     ) -> HTTPResponse:
         """Make a POST request."""
         return await self._request("POST", url, data=data, json=json, headers=headers)
@@ -113,9 +113,9 @@ class HTTPAdapter:
     async def put(
         self,
         url: str,
-        data: Optional[Union[str, Dict[str, Any]]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None
+        data: str | dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None
     ) -> HTTPResponse:
         """Make a PUT request."""
         return await self._request("PUT", url, data=data, json=json, headers=headers)
@@ -123,7 +123,7 @@ class HTTPAdapter:
     async def delete(
         self,
         url: str,
-        headers: Optional[Dict[str, str]] = None
+        headers: dict[str, str] | None = None
     ) -> HTTPResponse:
         """Make a DELETE request."""
         return await self._request("DELETE", url, headers=headers)
@@ -132,10 +132,10 @@ class HTTPAdapter:
         self,
         method: str,
         url: str,
-        params: Optional[Dict[str, Any]] = None,
-        data: Optional[Union[str, Dict[str, Any]]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None
+        params: dict[str, Any] | None = None,
+        data: str | dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None
     ) -> HTTPResponse:
         """Make an HTTP request with retries."""
 
@@ -167,7 +167,7 @@ class HTTPAdapter:
 
             except ClientError as e:
                 response_time_ms = (time.perf_counter() - start_time) * 1000
-                raise Exception(f"HTTP {method} {url} failed: {e}")
+                raise Exception(f"HTTP {method} {url} failed: {e}") from e
 
         # Retry logic with exponential backoff
         last_exception = None
@@ -201,14 +201,14 @@ class HTTPAdapter:
         method: str,
         url_key: str = "url",
         response_key: str = "response",
-        params_key: Optional[str] = None,
-        data_key: Optional[str] = None,
-        json_key: Optional[str] = None,
-        headers_key: Optional[str] = None
-    ) -> Effect[Dict[str, Any], Dict[str, Any]]:
+        params_key: str | None = None,
+        data_key: str | None = None,
+        json_key: str | None = None,
+        headers_key: str | None = None
+    ) -> Effect[dict[str, Any], dict[str, Any]]:
         """Create an Effect for HTTP requests."""
 
-        async def http_effect(state: Dict[str, Any], ctx: Dict[str, Any]) -> tuple[Dict[str, Any], List[Dict[str, Any]], Any]:
+        async def http_effect(state: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], Any]:
             try:
                 url = state.get(url_key, "")
                 if not url:
@@ -249,12 +249,12 @@ class HTTPAdapter:
 def fetch_url(
     url: str,
     adapter: HTTPAdapter,
-    params: Optional[Dict[str, Any]] = None,
-    headers: Optional[Dict[str, str]] = None
-) -> Effect[Dict[str, Any], str]:
+    params: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None
+) -> Effect[dict[str, Any], str]:
     """Create an Effect that fetches a URL."""
 
-    async def fetch_effect(state: Dict[str, Any], ctx: Dict[str, Any]) -> tuple[Dict[str, Any], List[Dict[str, Any]], Any]:
+    async def fetch_effect(state: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], Any]:
         try:
             response = await adapter.get(url, params=params, headers=headers)
             return (state, [], {"success": True, "content": response.content})
@@ -266,13 +266,13 @@ def fetch_url(
 
 def post_data(
     url: str,
-    data: Union[str, Dict[str, Any]],
+    data: str | dict[str, Any],
     adapter: HTTPAdapter,
-    headers: Optional[Dict[str, str]] = None
-) -> Effect[Dict[str, Any], str]:
+    headers: dict[str, str] | None = None
+) -> Effect[dict[str, Any], str]:
     """Create an Effect that posts data to a URL."""
 
-    async def post_effect(state: Dict[str, Any], ctx: Dict[str, Any]) -> tuple[Dict[str, Any], List[Dict[str, Any]], Any]:
+    async def post_effect(state: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], Any]:
         try:
             response = await adapter.post(url, data=data, headers=headers)
             return (state, [], {"success": True, "content": response.content})
@@ -284,13 +284,13 @@ def post_data(
 
 def post_json(
     url: str,
-    json_data: Dict[str, Any],
+    json_data: dict[str, Any],
     adapter: HTTPAdapter,
-    headers: Optional[Dict[str, str]] = None
-) -> Effect[Dict[str, Any], str]:
+    headers: dict[str, str] | None = None
+) -> Effect[dict[str, Any], str]:
     """Create an Effect that posts JSON to a URL."""
 
-    async def post_json_effect(state: Dict[str, Any], ctx: Dict[str, Any]) -> tuple[Dict[str, Any], List[Dict[str, Any]], Any]:
+    async def post_json_effect(state: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], Any]:
         try:
             response = await adapter.post(url, json=json_data, headers=headers)
             return (state, [], {"success": True, "content": response.content})
@@ -307,8 +307,8 @@ class WebSearchAdapter:
     def __init__(
         self,
         search_url: str,
-        api_key: Optional[str] = None,
-        http_config: Optional[HTTPConfig] = None
+        api_key: str | None = None,
+        http_config: HTTPConfig | None = None
     ):
         self.search_url = search_url
         self.api_key = api_key
@@ -319,7 +319,7 @@ class WebSearchAdapter:
         query: str,
         num_results: int = 10,
         **kwargs: Any
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search the web."""
         params = {
             "q": query,
@@ -330,7 +330,7 @@ class WebSearchAdapter:
         if self.api_key:
             params["key"] = self.api_key
 
-        response = await self.http.get(self.search_url, params=params)
+        await self.http.get(self.search_url, params=params)
 
         # Parse response (this would be implementation-specific)
         # For now, return a mock structure
@@ -347,10 +347,10 @@ class WebSearchAdapter:
         self,
         query_key: str = "query",
         results_key: str = "search_results"
-    ) -> Effect[Dict[str, Any], Dict[str, Any]]:
+    ) -> Effect[dict[str, Any], dict[str, Any]]:
         """Create an Effect for web search."""
 
-        async def search_effect(state: Dict[str, Any], ctx: Dict[str, Any]) -> tuple[Dict[str, Any], List[Dict[str, Any]], Any]:
+        async def search_effect(state: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], Any]:
             try:
                 query = state.get(query_key, "")
                 if not query:
@@ -371,8 +371,8 @@ class WebSearchAdapter:
 
 # Factory functions
 def create_http_adapter(
-    config: Optional[HTTPConfig] = None,
-    session: Optional[aiohttp.ClientSession] = None
+    config: HTTPConfig | None = None,
+    session: aiohttp.ClientSession | None = None
 ) -> HTTPAdapter:
     """Create an HTTP adapter."""
     return HTTPAdapter(config, session)
@@ -380,8 +380,8 @@ def create_http_adapter(
 
 def create_web_search_adapter(
     search_url: str,
-    api_key: Optional[str] = None,
-    http_config: Optional[HTTPConfig] = None
+    api_key: str | None = None,
+    http_config: HTTPConfig | None = None
 ) -> WebSearchAdapter:
     """Create a web search adapter."""
     return WebSearchAdapter(search_url, api_key, http_config)

@@ -41,7 +41,7 @@ EffectFn = Callable[[S, dict[str, Any]], Awaitable[tuple[S, Trace, Result[A]]]]
 @dataclass(frozen=True)
 class Effect(Generic[S, A]):
     """The core Effect monad for async, stateful, traced computations.
-    
+
     Effect[S, A] represents a computation that:
     - Takes state S and context dict
     - Returns (new_state, trace, result)
@@ -111,7 +111,7 @@ class Effect(Generic[S, A]):
         *effects: Effect[S, Any]
     ) -> Effect[S, tuple[Any, ...]]:
         """Parallel composition of N effects using Applicative.
-        
+
         This is the key operation for true parallelism - all effects run
         concurrently and their results are combined.
         """

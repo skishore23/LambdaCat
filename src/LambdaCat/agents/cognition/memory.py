@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 S = TypeVar("S")  # State type
 
@@ -9,15 +9,15 @@ S = TypeVar("S")  # State type
 @dataclass(frozen=True)
 class AgentState(Generic[S]):
     """Persistent agent state with memory and beliefs.
-    
+
     This is the core state structure that agents maintain across
     interactions, supporting both explicit memory and weighted beliefs.
     """
 
-    data: Dict[str, Any] = field(default_factory=dict)
-    memory: Dict[str, Any] = field(default_factory=dict)
-    beliefs: Dict[str, float] = field(default_factory=dict)
-    scratch: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
+    memory: dict[str, Any] = field(default_factory=dict)
+    beliefs: dict[str, float] = field(default_factory=dict)
+    scratch: dict[str, Any] = field(default_factory=dict)
 
     def remember(self, key: str, value: Any) -> AgentState[S]:
         """Add a memory entry."""
@@ -36,7 +36,7 @@ class AgentState(Generic[S]):
 
     def update_belief(self, proposition: str, delta_logit: float) -> AgentState[S]:
         """Update belief in a proposition using log-odds.
-        
+
         Args:
             proposition: The proposition to update belief for
             delta_logit: Change in log-odds (positive = more likely, negative = less likely)
@@ -85,7 +85,7 @@ class AgentState(Generic[S]):
             scratch={}
         )
 
-    def update_data(self, updates: Dict[str, Any]) -> AgentState[S]:
+    def update_data(self, updates: dict[str, Any]) -> AgentState[S]:
         """Update the main data section."""
         new_data = dict(self.data)
         new_data.update(updates)
@@ -100,7 +100,7 @@ class AgentState(Generic[S]):
         """Get a data entry."""
         return self.data.get(key, default)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "data": self.data,
@@ -110,7 +110,7 @@ class AgentState(Generic[S]):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> AgentState[S]:
+    def from_dict(cls, data: dict[str, Any]) -> AgentState[S]:
         """Create from dictionary."""
         return cls(
             data=data.get("data", {}),
@@ -126,11 +126,11 @@ def bayesian_update(
     evidence_logit: float
 ) -> float:
     """Bayesian belief update in log-odds space.
-    
+
     Args:
         prior_logit: Prior belief as log-odds
         evidence_logit: Evidence strength as log-odds
-        
+
     Returns:
         Updated belief as log-odds
     """
@@ -138,15 +138,15 @@ def bayesian_update(
 
 
 def decay_beliefs(
-    beliefs: Dict[str, float],
+    beliefs: dict[str, float],
     decay_factor: float = 0.95
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Apply exponential decay to beliefs.
-    
+
     Args:
         beliefs: Current beliefs as log-odds
         decay_factor: Decay factor (0.0 to 1.0, closer to 0 = more decay)
-        
+
     Returns:
         Decayed beliefs
     """
@@ -154,15 +154,15 @@ def decay_beliefs(
 
 
 def normalize_beliefs(
-    beliefs: Dict[str, float],
+    beliefs: dict[str, float],
     max_logit: float = 10.0
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Normalize beliefs to prevent extreme values.
-    
+
     Args:
         beliefs: Current beliefs as log-odds
         max_logit: Maximum allowed log-odds value
-        
+
     Returns:
         Normalized beliefs
     """
@@ -174,15 +174,15 @@ def normalize_beliefs(
 
 # Memory management functions
 def consolidate_memory(
-    memory: Dict[str, Any],
+    memory: dict[str, Any],
     max_entries: int = 1000
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Consolidate memory by removing oldest entries if needed.
-    
+
     Args:
         memory: Current memory
         max_entries: Maximum number of entries to keep
-        
+
     Returns:
         Consolidated memory
     """
@@ -196,17 +196,17 @@ def consolidate_memory(
 
 
 def merge_memories(
-    memory1: Dict[str, Any],
-    memory2: Dict[str, Any],
+    memory1: dict[str, Any],
+    memory2: dict[str, Any],
     strategy: str = "left_biased"
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Merge two memories using the specified strategy.
-    
+
     Args:
         memory1: First memory
         memory2: Second memory
         strategy: Merge strategy ("left_biased", "right_biased", "timestamp_based")
-        
+
     Returns:
         Merged memory
     """
@@ -227,10 +227,10 @@ def memory_lens() -> Any:  # Lens[AgentState, Dict[str, Any]]
     """Lens for accessing the memory section."""
     from ..actions import lens
 
-    def get_memory(state: AgentState[S]) -> Dict[str, Any]:
+    def get_memory(state: AgentState[S]) -> dict[str, Any]:
         return state.memory
 
-    def set_memory(state: AgentState[S], new_memory: Dict[str, Any]) -> AgentState[S]:
+    def set_memory(state: AgentState[S], new_memory: dict[str, Any]) -> AgentState[S]:
         return AgentState(
             data=state.data,
             memory=new_memory,
@@ -245,10 +245,10 @@ def beliefs_lens() -> Any:  # Lens[AgentState, Dict[str, float]]
     """Lens for accessing the beliefs section."""
     from ..actions import lens
 
-    def get_beliefs(state: AgentState[S]) -> Dict[str, float]:
+    def get_beliefs(state: AgentState[S]) -> dict[str, float]:
         return state.beliefs
 
-    def set_beliefs(state: AgentState[S], new_beliefs: Dict[str, float]) -> AgentState[S]:
+    def set_beliefs(state: AgentState[S], new_beliefs: dict[str, float]) -> AgentState[S]:
         return AgentState(
             data=state.data,
             memory=state.memory,
@@ -263,10 +263,10 @@ def data_lens() -> Any:  # Lens[AgentState, Dict[str, Any]]
     """Lens for accessing the data section."""
     from ..actions import lens
 
-    def get_data(state: AgentState[S]) -> Dict[str, Any]:
+    def get_data(state: AgentState[S]) -> dict[str, Any]:
         return state.data
 
-    def set_data(state: AgentState[S], new_data: Dict[str, Any]) -> AgentState[S]:
+    def set_data(state: AgentState[S], new_data: dict[str, Any]) -> AgentState[S]:
         return AgentState(
             data=new_data,
             memory=state.memory,

@@ -4,7 +4,7 @@ import asyncio
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..core.effect import Effect, with_trace
 from ..core.instruments import get_observability
@@ -20,13 +20,13 @@ class SearchResult:
     snippet: str
     source: str
     relevance_score: float = 0.0
-    metadata: Dict[str, Any] = None
+    metadata: dict[str, Any] = None
 
     def __post_init__(self):
         if self.metadata is None:
             object.__setattr__(self, 'metadata', {})
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "title": self.title,
@@ -47,11 +47,11 @@ class SearchQuery:
     language: str = "en"
     region: str = "us"
     safe_search: str = "moderate"  # "off", "moderate", "strict"
-    date_range: Optional[str] = None  # "past_day", "past_week", "past_month", "past_year"
-    site_filter: Optional[str] = None
-    file_type: Optional[str] = None  # "pdf", "doc", "ppt", etc.
+    date_range: str | None = None  # "past_day", "past_week", "past_month", "past_year"
+    site_filter: str | None = None
+    file_type: str | None = None  # "pdf", "doc", "ppt", etc.
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "query": self.query,
@@ -69,7 +69,7 @@ class SearchProvider(ABC):
     """Abstract base class for search providers."""
 
     @abstractmethod
-    async def search(self, query: SearchQuery) -> List[SearchResult]:
+    async def search(self, query: SearchQuery) -> list[SearchResult]:
         """Perform a search and return results."""
         pass
 
@@ -82,7 +82,7 @@ class SearchProvider(ABC):
 class MockSearchProvider(SearchProvider):
     """Mock search provider for testing."""
 
-    def __init__(self, results: Optional[List[SearchResult]] = None):
+    def __init__(self, results: list[SearchResult] | None = None):
         self.results = results or [
             SearchResult(
                 title="Mock Result 1",
@@ -100,7 +100,7 @@ class MockSearchProvider(SearchProvider):
             )
         ]
 
-    async def search(self, query: SearchQuery) -> List[SearchResult]:
+    async def search(self, query: SearchQuery) -> list[SearchResult]:
         """Return mock results."""
         await asyncio.sleep(0.1)  # Simulate network delay
         return self.results[:query.num_results]
@@ -119,14 +119,14 @@ class GoogleSearchProvider(SearchProvider):
         self,
         api_key: str,
         search_engine_id: str,
-        http_config: Optional[HTTPConfig] = None
+        http_config: HTTPConfig | None = None
     ):
         self.api_key = api_key
         self.search_engine_id = search_engine_id
         self.http = HTTPAdapter(http_config)
         self.base_url = "https://www.googleapis.com/customsearch/v1"
 
-    async def search(self, query: SearchQuery) -> List[SearchResult]:
+    async def search(self, query: SearchQuery) -> list[SearchResult]:
         """Search using Google Custom Search API."""
         params = {
             "key": self.api_key,
@@ -174,7 +174,7 @@ class GoogleSearchProvider(SearchProvider):
             return results
 
         except Exception as e:
-            raise Exception(f"Google search failed: {e}")
+            raise Exception(f"Google search failed: {e}") from e
 
     async def search_stream(self, query: SearchQuery) -> AsyncGenerator[SearchResult, None]:
         """Stream search results (not supported by Google API, so just return search results)."""
@@ -189,13 +189,13 @@ class FirecrawlSearchProvider(SearchProvider):
     def __init__(
         self,
         api_key: str,
-        http_config: Optional[HTTPConfig] = None
+        http_config: HTTPConfig | None = None
     ):
         self.api_key = api_key
         self.http = HTTPAdapter(http_config)
         self.base_url = "https://api.firecrawl.dev/v1/search"
 
-    async def search(self, query: SearchQuery) -> List[SearchResult]:
+    async def search(self, query: SearchQuery) -> list[SearchResult]:
         """Search using Firecrawl API."""
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -261,7 +261,7 @@ class FirecrawlSearchProvider(SearchProvider):
             return results
 
         except Exception as e:
-            raise Exception(f"Firecrawl search failed: {e}")
+            raise Exception(f"Firecrawl search failed: {e}") from e
 
     async def search_stream(self, query: SearchQuery) -> AsyncGenerator[SearchResult, None]:
         """Stream search results (Firecrawl doesn't support streaming, so return search results)."""
@@ -276,13 +276,13 @@ class BingSearchProvider(SearchProvider):
     def __init__(
         self,
         api_key: str,
-        http_config: Optional[HTTPConfig] = None
+        http_config: HTTPConfig | None = None
     ):
         self.api_key = api_key
         self.http = HTTPAdapter(http_config)
         self.base_url = "https://api.bing.microsoft.com/v7.0/search"
 
-    async def search(self, query: SearchQuery) -> List[SearchResult]:
+    async def search(self, query: SearchQuery) -> list[SearchResult]:
         """Search using Bing Search API."""
         headers = {
             "Ocp-Apim-Subscription-Key": self.api_key
@@ -338,7 +338,7 @@ class BingSearchProvider(SearchProvider):
             return results
 
         except Exception as e:
-            raise Exception(f"Bing search failed: {e}")
+            raise Exception(f"Bing search failed: {e}") from e
 
     async def search_stream(self, query: SearchQuery) -> AsyncGenerator[SearchResult, None]:
         """Stream search results (not supported by Bing API, so just return search results)."""
@@ -352,8 +352,8 @@ class WebSearchAdapter:
 
     def __init__(
         self,
-        providers: List[SearchProvider],
-        primary_provider: Optional[SearchProvider] = None
+        providers: list[SearchProvider],
+        primary_provider: SearchProvider | None = None
     ):
         self.providers = providers
         self.primary_provider = primary_provider or providers[0] if providers else None
@@ -363,9 +363,9 @@ class WebSearchAdapter:
         self,
         query: str,
         num_results: int = 10,
-        provider: Optional[SearchProvider] = None,
+        provider: SearchProvider | None = None,
         **kwargs
-    ) -> List[SearchResult]:
+    ) -> list[SearchResult]:
         """Search using the specified or primary provider."""
         search_query = SearchQuery(
             query=query,
@@ -399,7 +399,7 @@ class WebSearchAdapter:
         query: str,
         num_results_per_provider: int = 5,
         **kwargs
-    ) -> List[SearchResult]:
+    ) -> list[SearchResult]:
         """Search using multiple providers and combine results."""
         search_query = SearchQuery(
             query=query,
@@ -437,7 +437,7 @@ class WebSearchAdapter:
         self,
         query: str,
         num_results: int = 10,
-        provider: Optional[SearchProvider] = None,
+        provider: SearchProvider | None = None,
         **kwargs
     ) -> AsyncGenerator[SearchResult, None]:
         """Stream search results."""
@@ -459,10 +459,10 @@ class WebSearchAdapter:
         query_key: str = "query",
         results_key: str = "search_results",
         num_results: int = 10
-    ) -> Effect[Dict[str, Any], Dict[str, Any]]:
+    ) -> Effect[dict[str, Any], dict[str, Any]]:
         """Create an Effect for web search."""
 
-        async def search_effect(state: Dict[str, Any], ctx: Dict[str, Any]) -> tuple[Dict[str, Any], List[Dict[str, Any]], Any]:
+        async def search_effect(state: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], Any]:
             try:
                 query = state.get(query_key, "")
                 if not query:
@@ -494,7 +494,7 @@ def create_mock_search_adapter() -> WebSearchAdapter:
 def create_google_search_adapter(
     api_key: str,
     search_engine_id: str,
-    http_config: Optional[HTTPConfig] = None
+    http_config: HTTPConfig | None = None
 ) -> WebSearchAdapter:
     """Create a Google search adapter."""
     provider = GoogleSearchProvider(api_key, search_engine_id, http_config)
@@ -503,7 +503,7 @@ def create_google_search_adapter(
 
 def create_firecrawl_search_adapter(
     api_key: str,
-    http_config: Optional[HTTPConfig] = None
+    http_config: HTTPConfig | None = None
 ) -> WebSearchAdapter:
     """Create a Firecrawl search adapter."""
     provider = FirecrawlSearchProvider(api_key, http_config)
@@ -512,7 +512,7 @@ def create_firecrawl_search_adapter(
 
 def create_bing_search_adapter(
     api_key: str,
-    http_config: Optional[HTTPConfig] = None
+    http_config: HTTPConfig | None = None
 ) -> WebSearchAdapter:
     """Create a Bing search adapter."""
     provider = BingSearchProvider(api_key, http_config)
@@ -520,8 +520,8 @@ def create_bing_search_adapter(
 
 
 def create_multi_provider_search_adapter(
-    providers: List[SearchProvider],
-    primary_provider: Optional[SearchProvider] = None
+    providers: list[SearchProvider],
+    primary_provider: SearchProvider | None = None
 ) -> WebSearchAdapter:
     """Create a multi-provider search adapter."""
     return WebSearchAdapter(providers, primary_provider)
@@ -532,10 +532,10 @@ def search_web(
     query: str,
     adapter: WebSearchAdapter,
     num_results: int = 10
-) -> Effect[Dict[str, Any], List[SearchResult]]:
+) -> Effect[dict[str, Any], list[SearchResult]]:
     """Create an Effect that searches the web."""
 
-    async def search_effect(state: Dict[str, Any], ctx: Dict[str, Any]) -> tuple[Dict[str, Any], List[Dict[str, Any]], Any]:
+    async def search_effect(state: dict[str, Any], ctx: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], Any]:
         try:
             results = await adapter.search(query, num_results=num_results)
             return (state, [], {"success": True, "results": results})

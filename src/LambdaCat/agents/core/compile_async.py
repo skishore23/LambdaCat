@@ -111,14 +111,14 @@ class AsyncCompiler(Generic[S, Ctx]):
                     import inspect
                     sig = inspect.signature(action)
                     params = list(sig.parameters.values())
-                    
+
                     if len(params) == 1:
                         result = action(s)
                     elif len(params) == 2:
                         result = action(s, ctx)
                     else:
                         raise TypeError(f"Action must accept 1 (s) or 2 (s, ctx) parameters, got {len(params)}")
-                    
+
                     return (result, [{"span": f"task:{task.name}"}], Ok(result))
                 except Exception as e:
                     return (s, [{"span": f"task:{task.name}", "error": str(e)}], Err(e))

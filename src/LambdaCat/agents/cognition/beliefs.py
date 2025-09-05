@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any, Dict, Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 S = TypeVar("S")  # State type
 
@@ -40,7 +40,7 @@ class Belief(Generic[S]):
 class BeliefSystem(Generic[S]):
     """A system for managing weighted beliefs."""
 
-    beliefs: Dict[str, Belief[S]] = None
+    beliefs: dict[str, Belief[S]] = None
 
     def __post_init__(self):
         if self.beliefs is None:
@@ -199,7 +199,7 @@ class BeliefSystem(Generic[S]):
 
         return BeliefSystem(beliefs=new_beliefs)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             prop: {
@@ -213,7 +213,7 @@ class BeliefSystem(Generic[S]):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> BeliefSystem[S]:
+    def from_dict(cls, data: dict[str, Any]) -> BeliefSystem[S]:
         """Create from dictionary."""
         beliefs = {}
         for prop, belief_data in data.items():
@@ -238,13 +238,13 @@ def bayesian_update(
     evidence_confidence: float = 1.0
 ) -> tuple[float, float]:
     """Bayesian belief update in log-odds space.
-    
+
     Args:
         prior_logit: Prior belief as log-odds
         evidence_logit: Evidence strength as log-odds
         prior_confidence: Prior confidence (0.0 to 1.0)
         evidence_confidence: Evidence confidence (0.0 to 1.0)
-        
+
     Returns:
         (updated_logit, updated_confidence)
     """
@@ -283,7 +283,7 @@ def create_belief_system() -> BeliefSystem[S]:
     return BeliefSystem()
 
 
-def create_belief_system_from_dict(data: Dict[str, Any]) -> BeliefSystem[S]:
+def create_belief_system_from_dict(data: dict[str, Any]) -> BeliefSystem[S]:
     """Create a belief system from dictionary data."""
     return BeliefSystem.from_dict(data)
 

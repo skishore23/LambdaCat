@@ -5,7 +5,7 @@ import sqlite3
 from abc import ABC, abstractmethod
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Callable, Dict, Generic, Optional, TypeVar
+from typing import Any, Callable, Generic, TypeVar
 
 from ..cognition.memory import AgentState
 
@@ -21,7 +21,7 @@ class PersistenceBackend(ABC, Generic[S]):
         pass
 
     @abstractmethod
-    async def load(self, key: str, constructor: Callable[[Dict[str, Any]], S]) -> Optional[S]:
+    async def load(self, key: str, constructor: Callable[[dict[str, Any]], S]) -> S | None:
         """Load state with the given key."""
         pass
 
@@ -66,7 +66,7 @@ class JSONFileBackend(PersistenceBackend[S]):
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
-    async def load(self, key: str, constructor: Callable[[Dict[str, Any]], S]) -> Optional[S]:
+    async def load(self, key: str, constructor: Callable[[dict[str, Any]], S]) -> S | None:
         """Load state from JSON file."""
         file_path = self._get_file_path(key)
 
@@ -140,7 +140,7 @@ class SQLiteBackend(PersistenceBackend[S]):
                 VALUES (?, ?)
             """, (key, json_data))
 
-    async def load(self, key: str, constructor: Callable[[Dict[str, Any]], S]) -> Optional[S]:
+    async def load(self, key: str, constructor: Callable[[dict[str, Any]], S]) -> S | None:
         """Load state from SQLite."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute("SELECT data FROM agent_states WHERE key = ?", (key,))
@@ -179,8 +179,8 @@ class RedisBackend(PersistenceBackend[S]):
     def __init__(self, host: str = "localhost", port: int = 6379, db: int = 0, prefix: str = "agent:"):
         try:
             import redis.asyncio as redis
-        except ImportError:
-            raise ImportError("Redis backend requires redis-py: pip install redis")
+        except ImportError as e:
+            raise ImportError("Redis backend requires redis-py: pip install redis") from e
 
         self.redis = redis.Redis(host=host, port=port, db=db, decode_responses=True)
         self.prefix = prefix
@@ -201,7 +201,7 @@ class RedisBackend(PersistenceBackend[S]):
         json_data = json.dumps(data, ensure_ascii=False)
         await self.redis.set(self._get_key(key), json_data)
 
-    async def load(self, key: str, constructor: Callable[[Dict[str, Any]], S]) -> Optional[S]:
+    async def load(self, key: str, constructor: Callable[[dict[str, Any]], S]) -> S | None:
         """Load state from Redis."""
         json_data = await self.redis.get(self._get_key(key))
 
@@ -235,11 +235,11 @@ def create_backend(
     **kwargs
 ) -> PersistenceBackend[S]:
     """Create a persistence backend.
-    
+
     Args:
         backend_type: Type of backend ("json", "sqlite", "redis")
         **kwargs: Backend-specific configuration
-        
+
     Returns:
         Configured persistence backend
     """
@@ -264,7 +264,7 @@ class PersistenceManager(Generic[S]):
         """Save an agent state."""
         await self.backend.save(f"agent:{agent_id}", state)
 
-    async def load_agent_state(self, agent_id: str) -> Optional[AgentState[S]]:
+    async def load_agent_state(self, agent_id: str) -> AgentState[S] | None:
         """Load an agent state."""
         return await self.backend.load(f"agent:{agent_id}", AgentState.from_dict)
 
@@ -272,7 +272,7 @@ class PersistenceManager(Generic[S]):
         """Save a checkpoint."""
         await self.backend.save(f"checkpoint:{checkpoint_id}", state)
 
-    async def load_checkpoint(self, checkpoint_id: str, constructor: Callable[[Dict[str, Any]], S]) -> Optional[S]:
+    async def load_checkpoint(self, checkpoint_id: str, constructor: Callable[[dict[str, Any]], S]) -> S | None:
         """Load a checkpoint."""
         return await self.backend.load(f"checkpoint:{checkpoint_id}", constructor)
 
@@ -309,9 +309,9 @@ async def save_state(
 
 async def load_state(
     key: str,
-    constructor: Callable[[Dict[str, Any]], S],
+    constructor: Callable[[dict[str, Any]], S],
     backend: PersistenceBackend[S] | None = None
-) -> Optional[S]:
+) -> S | None:
     """Load a state with the given key."""
     if backend is None:
         backend = JSONFileBackend()
